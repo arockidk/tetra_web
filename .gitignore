@@ -2,3 +2,5 @@ target/
 node_modules/
 interbuild
 rs_tetris_utils
+package-lock.json
+transform_spritesheet.py

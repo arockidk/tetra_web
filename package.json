@@ -5,18 +5,17 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "get_tet_lib": "git clone https://github.com/arockidk/rs_tetris_utils.git"
+    "clear_tet_lib": "rm -rf rs_tetris_utils/",
+    "get_tet_lib": "git clone https://github.com/arockidk/rs_tetris_utils.git && cd ./rs_tetris_utils && wasm-pack build --target web && cp -r ./pkg ../dist/scripts/pkg && cd .. ",
+    "update_tet_lib": "npm run clear_tet_lib && npm run get_tet_lib",
+    "dev": "dev.bat"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "pixi": "^0.3.1",
+    "pixi.js": "^7.4.0",
     "rs_tetris_utils": "file:rs_tetris_utils/pkg"
-  },
-  "devDependencies": {
-    "copy-webpack-plugin": "^11.0.0",
-    "webpack": "^5.90.1",
-    "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^4.15.1"
   }
 }
