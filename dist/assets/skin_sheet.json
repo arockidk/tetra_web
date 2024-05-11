@@ -143,13 +143,31 @@
                 "w": 32,
                 "h": 32
             }
+        },
+        ".": {
+            "frame": {
+                "x": 256,
+                "y": 0,
+                "w": 32,
+                "h": 32
+            },
+            "sourceSize": {
+                "w": 32,
+                "h": 32
+            },
+            "spriteSourceSize": {
+                "x": 0,
+                "y": 0,
+                "w": 32,
+                "h": 32
+            }
         }
-    },
+    }, 
     "meta": {
-        "image": "./dist/assets/Tetra_Skin.png",
+        "image": "Tetra_Skin.png",
         "format": "RGBA8888",
         "size": {
-            "w": 256,
+            "w": 288,
             "h": 32
         },
         "scale": 1
