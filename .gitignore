@@ -1,6 +1,9 @@
 target/
 node_modules/
 interbuild
-rust_tetro
+rust_tetro/
 package-lock.json
 transform_spritesheet.py
+dist/scripts/
+dist/pixi.min.js
+dist/*.wasm
