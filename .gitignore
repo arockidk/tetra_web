@@ -1,6 +1,6 @@
 target/
 node_modules/
 interbuild
-rs_tetris_utils
+rust_tetro
 package-lock.json
 transform_spritesheet.py
