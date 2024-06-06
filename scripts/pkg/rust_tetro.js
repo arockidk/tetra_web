@@ -314,25 +314,25 @@ function handleError(f, args) {
 }
 /**
 */
-export const Direction = Object.freeze({ North:0,"0":"North",East:1,"1":"East",South:2,"2":"South",West:3,"3":"West", });
+export const PieceType = Object.freeze({ I:1,"1":"I",L:2,"2":"L",O:3,"3":"O",Z:4,"4":"Z",T:5,"5":"T",J:6,"6":"J",S:7,"7":"S", });
 /**
 */
 export const TSpinResult = Object.freeze({ NoSpin:0,"0":"NoSpin",MiniSpin:1,"1":"MiniSpin",TSpin:2,"2":"TSpin", });
 /**
 */
-export const PieceType = Object.freeze({ I:1,"1":"I",L:2,"2":"L",O:3,"3":"O",Z:4,"4":"Z",T:5,"5":"T",J:6,"6":"J",S:7,"7":"S", });
-/**
-*/
-export const PieceColor = Object.freeze({ B:0,"0":"B",I:1,"1":"I",L:2,"2":"L",O:3,"3":"O",Z:4,"4":"Z",T:5,"5":"T",J:6,"6":"J",S:7,"7":"S", });
+export const Direction = Object.freeze({ North:0,"0":"North",East:1,"1":"East",South:2,"2":"South",West:3,"3":"West", });
 /**
 */
 export const QueueNodeType = Object.freeze({ Choose:0,"0":"Choose",Piece:1,"1":"Piece", });
 /**
 */
-export const RotationState = Object.freeze({ South:0,"0":"South",East:1,"1":"East",North:2,"2":"North",West:3,"3":"West", });
+export const PieceColor = Object.freeze({ B:0,"0":"B",I:1,"1":"I",L:2,"2":"L",O:3,"3":"O",Z:4,"4":"Z",T:5,"5":"T",J:6,"6":"J",S:7,"7":"S", });
 /**
 */
 export const CellColor = Object.freeze({ Empty:0,"0":"Empty",I:1,"1":"I",L:2,"2":"L",O:3,"3":"O",Z:4,"4":"Z",T:5,"5":"T",J:6,"6":"J",S:7,"7":"S",Grey:8,"8":"Grey", });
+/**
+*/
+export const RotationState = Object.freeze({ South:0,"0":"South",East:1,"1":"East",North:2,"2":"North",West:3,"3":"West", });
 
 const ActionFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }

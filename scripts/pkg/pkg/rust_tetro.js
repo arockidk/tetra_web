@@ -1,35 +1,8 @@
 let wasm;
 
-const heap = new Array(128).fill(undefined);
+const cachedTextDecoder = (typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { ignoreBOM: true, fatal: true }) : { decode: () => { throw Error('TextDecoder not available') } } );
 
-heap.push(undefined, null, true, false);
-
-function getObject(idx) { return heap[idx]; }
-
-let heap_next = heap.length;
-
-function dropObject(idx) {
-    if (idx < 132) return;
-    heap[idx] = heap_next;
-    heap_next = idx;
-}
-
-function takeObject(idx) {
-    const ret = getObject(idx);
-    dropObject(idx);
-    return ret;
-}
-
-function addHeapObject(obj) {
-    if (heap_next === heap.length) heap.push(heap.length + 1);
-    const idx = heap_next;
-    heap_next = heap[idx];
-
-    heap[idx] = obj;
-    return idx;
-}
-
-let WASM_VECTOR_LEN = 0;
+if (typeof TextDecoder !== 'undefined') { cachedTextDecoder.decode(); };
 
 let cachedUint8Memory0 = null;
 
@@ -39,6 +12,42 @@ function getUint8Memory0() {
     }
     return cachedUint8Memory0;
 }
+
+function getStringFromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return cachedTextDecoder.decode(getUint8Memory0().subarray(ptr, ptr + len));
+}
+
+const heap = new Array(128).fill(undefined);
+
+heap.push(undefined, null, true, false);
+
+let heap_next = heap.length;
+
+function addHeapObject(obj) {
+    if (heap_next === heap.length) heap.push(heap.length + 1);
+    const idx = heap_next;
+    heap_next = heap[idx];
+
+    if (typeof(heap_next) !== 'number') throw new Error('corrupt heap');
+
+    heap[idx] = obj;
+    return idx;
+}
+
+function getObject(idx) { return heap[idx]; }
+
+function _assertBoolean(n) {
+    if (typeof(n) !== 'boolean') {
+        throw new Error(`expected a boolean argument, found ${typeof(n)}`);
+    }
+}
+
+function _assertNum(n) {
+    if (typeof(n) !== 'number') throw new Error(`expected a number argument, found ${typeof(n)}`);
+}
+
+let WASM_VECTOR_LEN = 0;
 
 const cachedTextEncoder = (typeof TextEncoder !== 'undefined' ? new TextEncoder('utf-8') : { encode: () => { throw Error('TextEncoder not available') } } );
 
@@ -56,6 +65,8 @@ const encodeString = (typeof cachedTextEncoder.encodeInto === 'function'
 });
 
 function passStringToWasm0(arg, malloc, realloc) {
+
+    if (typeof(arg) !== 'string') throw new Error(`expected a string argument, found ${typeof(arg)}`);
 
     if (realloc === undefined) {
         const buf = cachedTextEncoder.encode(arg);
@@ -85,7 +96,7 @@ function passStringToWasm0(arg, malloc, realloc) {
         ptr = realloc(ptr, len, len = offset + arg.length * 3, 1) >>> 0;
         const view = getUint8Memory0().subarray(ptr + offset, ptr + len);
         const ret = encodeString(arg, view);
-
+        if (ret.read !== arg.length) throw new Error('failed to pass whole string');
         offset += ret.written;
         ptr = realloc(ptr, len, offset, 1) >>> 0;
     }
@@ -107,15 +118,6 @@ function getInt32Memory0() {
     return cachedInt32Memory0;
 }
 
-const cachedTextDecoder = (typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { ignoreBOM: true, fatal: true }) : { decode: () => { throw Error('TextDecoder not available') } } );
-
-if (typeof TextDecoder !== 'undefined') { cachedTextDecoder.decode(); };
-
-function getStringFromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return cachedTextDecoder.decode(getUint8Memory0().subarray(ptr, ptr + len));
-}
-
 let cachedFloat64Memory0 = null;
 
 function getFloat64Memory0() {
@@ -123,15 +125,6 @@ function getFloat64Memory0() {
         cachedFloat64Memory0 = new Float64Array(wasm.memory.buffer);
     }
     return cachedFloat64Memory0;
-}
-
-let cachedBigInt64Memory0 = null;
-
-function getBigInt64Memory0() {
-    if (cachedBigInt64Memory0 === null || cachedBigInt64Memory0.byteLength === 0) {
-        cachedBigInt64Memory0 = new BigInt64Array(wasm.memory.buffer);
-    }
-    return cachedBigInt64Memory0;
 }
 
 function debugString(val) {
@@ -199,22 +192,36 @@ function debugString(val) {
     return className;
 }
 
-function _assertClass(instance, klass) {
-    if (!(instance instanceof klass)) {
-        throw new Error(`expected instance of ${klass.name}`);
-    }
-    return instance.ptr;
+function _assertBigInt(n) {
+    if (typeof(n) !== 'bigint') throw new Error(`expected a bigint argument, found ${typeof(n)}`);
 }
 
-function getArrayI32FromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return getInt32Memory0().subarray(ptr / 4, ptr / 4 + len);
+let cachedBigInt64Memory0 = null;
+
+function getBigInt64Memory0() {
+    if (cachedBigInt64Memory0 === null || cachedBigInt64Memory0.byteLength === 0) {
+        cachedBigInt64Memory0 = new BigInt64Array(wasm.memory.buffer);
+    }
+    return cachedBigInt64Memory0;
+}
+
+function dropObject(idx) {
+    if (idx < 132) return;
+    heap[idx] = heap_next;
+    heap_next = idx;
+}
+
+function takeObject(idx) {
+    const ret = getObject(idx);
+    dropObject(idx);
+    return ret;
 }
 /**
 * @param {number} int
 * @returns {PieceColor}
 */
 export function pieceColorFromInt(int) {
+    _assertNum(int);
     const ret = wasm.pieceColorFromInt(int);
     return ret;
 }
@@ -235,6 +242,7 @@ export function pieceColorFromStr(str) {
 * @returns {string}
 */
 export function pieceColorToChar(color) {
+    _assertNum(color);
     const ret = wasm.pieceColorToChar(color);
     return String.fromCodePoint(ret);
 }
@@ -244,7 +252,8 @@ export function pieceColorToChar(color) {
 * @returns {number}
 */
 export function direction_to_i8(dir) {
-    const ret = wasm.direction_to_i32(dir);
+    _assertNum(dir);
+    const ret = wasm.direction_to_i8(dir);
     return ret;
 }
 
@@ -253,6 +262,7 @@ export function direction_to_i8(dir) {
 * @returns {number}
 */
 export function direction_to_i32(dir) {
+    _assertNum(dir);
     const ret = wasm.direction_to_i32(dir);
     return ret;
 }
@@ -262,8 +272,37 @@ export function direction_to_i32(dir) {
 * @returns {bigint}
 */
 export function direction_to_i64(dir) {
+    _assertNum(dir);
     const ret = wasm.direction_to_i64(dir);
     return ret;
+}
+
+function _assertClass(instance, klass) {
+    if (!(instance instanceof klass)) {
+        throw new Error(`expected instance of ${klass.name}`);
+    }
+    return instance.ptr;
+}
+
+function logError(f, args) {
+    try {
+        return f.apply(this, args);
+    } catch (e) {
+        let error = (function () {
+            try {
+                return e instanceof Error ? `${e.message}\n\nStack:\n${e.stack}` : e.toString();
+            } catch(_) {
+                return "<failed to stringify thrown value>";
+            }
+        }());
+        console.error("wasm-bindgen: imported JS function that was not marked as `catch` threw an error:", error);
+        throw e;
+    }
+}
+
+function getArrayI32FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getInt32Memory0().subarray(ptr / 4, ptr / 4 + len);
 }
 
 function handleError(f, args) {
@@ -275,7 +314,13 @@ function handleError(f, args) {
 }
 /**
 */
-export const RotationState = Object.freeze({ South:0,"0":"South",East:1,"1":"East",North:2,"2":"North",West:3,"3":"West", });
+export const PieceType = Object.freeze({ I:1,"1":"I",L:2,"2":"L",O:3,"3":"O",Z:4,"4":"Z",T:5,"5":"T",J:6,"6":"J",S:7,"7":"S", });
+/**
+*/
+export const TSpinResult = Object.freeze({ NoSpin:0,"0":"NoSpin",MiniSpin:1,"1":"MiniSpin",TSpin:2,"2":"TSpin", });
+/**
+*/
+export const Direction = Object.freeze({ North:0,"0":"North",East:1,"1":"East",South:2,"2":"South",West:3,"3":"West", });
 /**
 */
 export const QueueNodeType = Object.freeze({ Choose:0,"0":"Choose",Piece:1,"1":"Piece", });
@@ -284,16 +329,10 @@ export const QueueNodeType = Object.freeze({ Choose:0,"0":"Choose",Piece:1,"1":"
 export const PieceColor = Object.freeze({ B:0,"0":"B",I:1,"1":"I",L:2,"2":"L",O:3,"3":"O",Z:4,"4":"Z",T:5,"5":"T",J:6,"6":"J",S:7,"7":"S", });
 /**
 */
-export const Direction = Object.freeze({ North:0,"0":"North",East:1,"1":"East",South:2,"2":"South",West:3,"3":"West", });
-/**
-*/
 export const CellColor = Object.freeze({ Empty:0,"0":"Empty",I:1,"1":"I",L:2,"2":"L",O:3,"3":"O",Z:4,"4":"Z",T:5,"5":"T",J:6,"6":"J",S:7,"7":"S",Grey:8,"8":"Grey", });
 /**
 */
-export const TSpinResult = Object.freeze({ NoSpin:0,"0":"NoSpin",MiniSpin:1,"1":"MiniSpin",TSpin:2,"2":"TSpin", });
-/**
-*/
-export const PieceType = Object.freeze({ I:1,"1":"I",L:2,"2":"L",O:3,"3":"O",Z:4,"4":"Z",T:5,"5":"T",J:6,"6":"J",S:7,"7":"S", });
+export const RotationState = Object.freeze({ South:0,"0":"South",East:1,"1":"East",North:2,"2":"North",West:3,"3":"West", });
 
 const ActionFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
@@ -314,6 +353,10 @@ const ActionFinalization = (typeof FinalizationRegistry === 'undefined')
 */
 export class Action {
 
+    constructor() {
+        throw new Error('cannot invoke `new` directly');
+    }
+
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
         this.__wbg_ptr = 0;
@@ -329,6 +372,8 @@ export class Action {
     * @returns {number}
     */
     get 0() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_action_0(this.__wbg_ptr);
         return ret;
     }
@@ -336,13 +381,18 @@ export class Action {
     * @param {number} arg0
     */
     set 0(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(arg0);
         wasm.__wbg_set_action_0(this.__wbg_ptr, arg0);
     }
     /**
     * @returns {boolean}
     */
     get_left() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
+        _assertNum(ptr);
         const ret = wasm.action_get_left(ptr);
         return ret !== 0;
     }
@@ -350,7 +400,9 @@ export class Action {
     * @returns {boolean}
     */
     get_right() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
+        _assertNum(ptr);
         const ret = wasm.action_get_right(ptr);
         return ret !== 0;
     }
@@ -358,7 +410,9 @@ export class Action {
     * @returns {boolean}
     */
     get_soft_drop() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
+        _assertNum(ptr);
         const ret = wasm.action_get_soft_drop(ptr);
         return ret !== 0;
     }
@@ -366,7 +420,9 @@ export class Action {
     * @returns {boolean}
     */
     get_hard_drop() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
+        _assertNum(ptr);
         const ret = wasm.action_get_hard_drop(ptr);
         return ret !== 0;
     }
@@ -374,7 +430,9 @@ export class Action {
     * @returns {boolean}
     */
     get_counter_clockwise() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
+        _assertNum(ptr);
         const ret = wasm.action_get_counter_clockwise(ptr);
         return ret !== 0;
     }
@@ -382,7 +440,9 @@ export class Action {
     * @returns {boolean}
     */
     get_clockwise() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
+        _assertNum(ptr);
         const ret = wasm.action_get_clockwise(ptr);
         return ret !== 0;
     }
@@ -390,7 +450,9 @@ export class Action {
     * @returns {boolean}
     */
     get_hold() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
+        _assertNum(ptr);
         const ret = wasm.action_get_hold(ptr);
         return ret !== 0;
     }
@@ -398,7 +460,9 @@ export class Action {
     * @returns {boolean}
     */
     get_180_rotation() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
+        _assertNum(ptr);
         const ret = wasm.action_get_180_rotation(ptr);
         return ret !== 0;
     }
@@ -406,56 +470,80 @@ export class Action {
     * @param {boolean} value
     */
     set_left(value) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
-        wasm.action_set_180_rotation(ptr, value);
+        _assertNum(ptr);
+        _assertBoolean(value);
+        wasm.action_set_left(ptr, value);
     }
     /**
     * @param {boolean} value
     */
     set_right(value) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
-        wasm.action_set_180_rotation(ptr, value);
+        _assertNum(ptr);
+        _assertBoolean(value);
+        wasm.action_set_right(ptr, value);
     }
     /**
     * @param {boolean} value
     */
     set_soft_drop(value) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
-        wasm.action_set_180_rotation(ptr, value);
+        _assertNum(ptr);
+        _assertBoolean(value);
+        wasm.action_set_soft_drop(ptr, value);
     }
     /**
     * @param {boolean} value
     */
     set_hard_drop(value) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
-        wasm.action_set_180_rotation(ptr, value);
+        _assertNum(ptr);
+        _assertBoolean(value);
+        wasm.action_set_hard_drop(ptr, value);
     }
     /**
     * @param {boolean} value
     */
     set_counter_clockwise(value) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
-        wasm.action_set_180_rotation(ptr, value);
+        _assertNum(ptr);
+        _assertBoolean(value);
+        wasm.action_set_counter_clockwise(ptr, value);
     }
     /**
     * @param {boolean} value
     */
     set_clockwise(value) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
-        wasm.action_set_180_rotation(ptr, value);
+        _assertNum(ptr);
+        _assertBoolean(value);
+        wasm.action_set_clockwise(ptr, value);
     }
     /**
     * @param {boolean} value
     */
     set_hold(value) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
-        wasm.action_set_180_rotation(ptr, value);
+        _assertNum(ptr);
+        _assertBoolean(value);
+        wasm.action_set_hold(ptr, value);
     }
     /**
     * @param {boolean} value
     */
     set_180_rotation(value) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
+        _assertNum(ptr);
+        _assertBoolean(value);
         wasm.action_set_180_rotation(ptr, value);
     }
 }
@@ -466,6 +554,10 @@ const ClearStructFinalization = (typeof FinalizationRegistry === 'undefined')
 /**
 */
 export class ClearStruct {
+
+    constructor() {
+        throw new Error('cannot invoke `new` directly');
+    }
 
     static __wrap(ptr) {
         ptr = ptr >>> 0;
@@ -490,6 +582,8 @@ export class ClearStruct {
     * @returns {boolean}
     */
     get 0() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_clearstruct_0(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -497,6 +591,9 @@ export class ClearStruct {
     * @param {boolean} arg0
     */
     set 0(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertBoolean(arg0);
         wasm.__wbg_set_clearstruct_0(this.__wbg_ptr, arg0);
     }
     /**
@@ -504,7 +601,9 @@ export class ClearStruct {
     */
     getLines() {
         try {
+            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            _assertNum(this.__wbg_ptr);
             wasm.clearstruct_getLines(retptr, this.__wbg_ptr);
             var r0 = getInt32Memory0()[retptr / 4 + 0];
             var r1 = getInt32Memory0()[retptr / 4 + 1];
@@ -523,6 +622,10 @@ const DecodeFumenErrorFinalization = (typeof FinalizationRegistry === 'undefined
 /**
 */
 export class DecodeFumenError {
+
+    constructor() {
+        throw new Error('cannot invoke `new` directly');
+    }
 
     static __wrap(ptr) {
         ptr = ptr >>> 0;
@@ -567,6 +670,8 @@ export class Field {
     * @returns {TetBoard}
     */
     get board() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_field_board(this.__wbg_ptr);
         return TetBoard.__wrap(ret);
     }
@@ -574,7 +679,12 @@ export class Field {
     * @param {TetBoard} arg0
     */
     set board(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(arg0, TetBoard);
+        if (arg0.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = arg0.__destroy_into_raw();
         wasm.__wbg_set_field_board(this.__wbg_ptr, ptr0);
     }
@@ -582,6 +692,8 @@ export class Field {
     * @returns {TetPiece | undefined}
     */
     get active_piece() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_field_active_piece(this.__wbg_ptr);
         return ret === 0 ? undefined : TetPiece.__wrap(ret);
     }
@@ -589,9 +701,14 @@ export class Field {
     * @param {TetPiece | undefined} [arg0]
     */
     set active_piece(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         let ptr0 = 0;
         if (!isLikeNone(arg0)) {
             _assertClass(arg0, TetPiece);
+            if (arg0.__wbg_ptr === 0) {
+                throw new Error('Attempt to use a moved value');
+            }
             ptr0 = arg0.__destroy_into_raw();
         }
         wasm.__wbg_set_field_active_piece(this.__wbg_ptr, ptr0);
@@ -600,6 +717,8 @@ export class Field {
     * @returns {TetPiece | undefined}
     */
     get hold() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_field_hold(this.__wbg_ptr);
         return ret === 0 ? undefined : TetPiece.__wrap(ret);
     }
@@ -607,9 +726,14 @@ export class Field {
     * @param {TetPiece | undefined} [arg0]
     */
     set hold(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         let ptr0 = 0;
         if (!isLikeNone(arg0)) {
             _assertClass(arg0, TetPiece);
+            if (arg0.__wbg_ptr === 0) {
+                throw new Error('Attempt to use a moved value');
+            }
             ptr0 = arg0.__destroy_into_raw();
         }
         wasm.__wbg_set_field_hold(this.__wbg_ptr, ptr0);
@@ -621,15 +745,24 @@ export class Field {
     */
     constructor(board, active_piece, hold) {
         _assertClass(board, TetBoard);
+        if (board.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = board.__destroy_into_raw();
         let ptr1 = 0;
         if (!isLikeNone(active_piece)) {
             _assertClass(active_piece, TetPiece);
+            if (active_piece.__wbg_ptr === 0) {
+                throw new Error('Attempt to use a moved value');
+            }
             ptr1 = active_piece.__destroy_into_raw();
         }
         let ptr2 = 0;
         if (!isLikeNone(hold)) {
             _assertClass(hold, TetPiece);
+            if (hold.__wbg_ptr === 0) {
+                throw new Error('Attempt to use a moved value');
+            }
             ptr2 = hold.__destroy_into_raw();
         }
         const ret = wasm.field_new(ptr0, ptr1, ptr2);
@@ -640,6 +773,8 @@ export class Field {
     * @returns {boolean}
     */
     canPlaceActivePiece() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.field_canPlaceActivePiece(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -648,6 +783,9 @@ export class Field {
     * @returns {boolean}
     */
     applyGravity(force) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(force);
         const ret = wasm.field_applyGravity(this.__wbg_ptr, force);
         return ret !== 0;
     }
@@ -656,6 +794,9 @@ export class Field {
     * @returns {boolean}
     */
     moveLeft(amount) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(amount);
         const ret = wasm.field_moveLeft(this.__wbg_ptr, amount);
         return ret !== 0;
     }
@@ -664,6 +805,9 @@ export class Field {
     * @returns {boolean}
     */
     moveRight(amount) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(amount);
         const ret = wasm.field_moveRight(this.__wbg_ptr, amount);
         return ret !== 0;
     }
@@ -673,6 +817,10 @@ export class Field {
     * @returns {number}
     */
     dasPiece(direction, force) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(direction);
+        _assertNum(force);
         const ret = wasm.field_dasPiece(this.__wbg_ptr, direction, force);
         return ret;
     }
@@ -680,6 +828,9 @@ export class Field {
     * @param {number} rotation
     */
     rotatePiece(rotation) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(rotation);
         wasm.field_rotatePiece(this.__wbg_ptr, rotation);
     }
     /**
@@ -688,6 +839,10 @@ export class Field {
     * @returns {number}
     */
     getTile(x, y) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(x);
+        _assertNum(y);
         const ret = wasm.field_getTile(this.__wbg_ptr, x, y);
         return ret;
     }
@@ -697,12 +852,19 @@ export class Field {
     * @param {number} color
     */
     setTile(x, y, color) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(x);
+        _assertNum(y);
+        _assertNum(color);
         wasm.field_setTile(this.__wbg_ptr, x, y, color);
     }
     /**
     * @returns {boolean}
     */
     place_active_piece() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.field_place_active_piece(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -710,6 +872,8 @@ export class Field {
     * @returns {ClearStruct}
     */
     place_n_clear_active_piece() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.field_place_n_clear_active_piece(this.__wbg_ptr);
         return ClearStruct.__wrap(ret);
     }
@@ -717,6 +881,8 @@ export class Field {
     * @returns {boolean}
     */
     checkPC() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.field_checkPC(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -724,6 +890,8 @@ export class Field {
     * @returns {TSpinResult}
     */
     checkTSpin() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.field_checkTSpin(this.__wbg_ptr);
         return ret;
     }
@@ -759,6 +927,8 @@ export class Fumen {
     * @returns {boolean}
     */
     get guideline() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_fumen_guideline(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -766,6 +936,9 @@ export class Fumen {
     * @param {boolean} arg0
     */
     set guideline(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertBoolean(arg0);
         wasm.__wbg_set_fumen_guideline(this.__wbg_ptr, arg0);
     }
     /**
@@ -783,7 +956,9 @@ export class Fumen {
         let deferred1_0;
         let deferred1_1;
         try {
+            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            _assertNum(this.__wbg_ptr);
             wasm.fumen_encode(retptr, this.__wbg_ptr);
             var r0 = getInt32Memory0()[retptr / 4 + 0];
             var r1 = getInt32Memory0()[retptr / 4 + 1];
@@ -825,6 +1000,8 @@ export class Fumen {
     * @returns {number}
     */
     addPage() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.fumen_addPage(this.__wbg_ptr);
         return ret >>> 0;
     }
@@ -832,6 +1009,8 @@ export class Fumen {
     * @returns {Array<any>}
     */
     get pages() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.fumen_pages(this.__wbg_ptr);
         return takeObject(ret);
     }
@@ -843,6 +1022,10 @@ const PageFinalization = (typeof FinalizationRegistry === 'undefined')
 /**
 */
 export class Page {
+
+    constructor() {
+        throw new Error('cannot invoke `new` directly');
+    }
 
     static __wrap(ptr) {
         ptr = ptr >>> 0;
@@ -867,6 +1050,8 @@ export class Page {
     * @returns {Piece | undefined}
     */
     get piece() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_page_piece(this.__wbg_ptr);
         return ret === 0 ? undefined : Piece.__wrap(ret);
     }
@@ -874,9 +1059,14 @@ export class Page {
     * @param {Piece | undefined} [arg0]
     */
     set piece(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         let ptr0 = 0;
         if (!isLikeNone(arg0)) {
             _assertClass(arg0, Piece);
+            if (arg0.__wbg_ptr === 0) {
+                throw new Error('Attempt to use a moved value');
+            }
             ptr0 = arg0.__destroy_into_raw();
         }
         wasm.__wbg_set_page_piece(this.__wbg_ptr, ptr0);
@@ -885,6 +1075,8 @@ export class Page {
     * @returns {boolean}
     */
     get rise() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_page_rise(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -892,12 +1084,17 @@ export class Page {
     * @param {boolean} arg0
     */
     set rise(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertBoolean(arg0);
         wasm.__wbg_set_page_rise(this.__wbg_ptr, arg0);
     }
     /**
     * @returns {boolean}
     */
     get mirror() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_page_mirror(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -905,12 +1102,17 @@ export class Page {
     * @param {boolean} arg0
     */
     set mirror(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertBoolean(arg0);
         wasm.__wbg_set_page_mirror(this.__wbg_ptr, arg0);
     }
     /**
     * @returns {boolean}
     */
     get lock() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_page_lock(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -918,6 +1120,9 @@ export class Page {
     * @param {boolean} arg0
     */
     set lock(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertBoolean(arg0);
         wasm.__wbg_set_page_lock(this.__wbg_ptr, arg0);
     }
     /**
@@ -927,6 +1132,8 @@ export class Page {
     * @returns {Page}
     */
     nextPage() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.page_nextPage(this.__wbg_ptr);
         return Page.__wrap(ret);
     }
@@ -935,7 +1142,9 @@ export class Page {
     */
     get comment() {
         try {
+            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            _assertNum(this.__wbg_ptr);
             wasm.page_comment(retptr, this.__wbg_ptr);
             var r0 = getInt32Memory0()[retptr / 4 + 0];
             var r1 = getInt32Memory0()[retptr / 4 + 1];
@@ -953,6 +1162,8 @@ export class Page {
     * @returns {Array<any>}
     */
     get field() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.page_field(this.__wbg_ptr);
         return takeObject(ret);
     }
@@ -960,6 +1171,8 @@ export class Page {
     * @returns {Array<any>}
     */
     get garbage_row() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.page_garbage_row(this.__wbg_ptr);
         return takeObject(ret);
     }
@@ -967,6 +1180,8 @@ export class Page {
     * @param {string | undefined} [comment]
     */
     set comment(comment) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         var ptr0 = isLikeNone(comment) ? 0 : passStringToWasm0(comment, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         var len0 = WASM_VECTOR_LEN;
         wasm.page_set_comment(this.__wbg_ptr, ptr0, len0);
@@ -975,12 +1190,16 @@ export class Page {
     * @param {Array<any>} field
     */
     set field(field) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         wasm.page_set_field(this.__wbg_ptr, addHeapObject(field));
     }
     /**
     * @param {Array<any>} garbage_row
     */
     set garbage_row(garbage_row) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         wasm.page_set_garbage_row(this.__wbg_ptr, addHeapObject(garbage_row));
     }
 }
@@ -992,6 +1211,10 @@ const PieceFinalization = (typeof FinalizationRegistry === 'undefined')
 * Represents a tetromino piece using true rotation.
 */
 export class Piece {
+
+    constructor() {
+        throw new Error('cannot invoke `new` directly');
+    }
 
     static __wrap(ptr) {
         ptr = ptr >>> 0;
@@ -1016,6 +1239,8 @@ export class Piece {
     * @returns {PieceType}
     */
     get kind() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_piece_kind(this.__wbg_ptr);
         return ret;
     }
@@ -1023,12 +1248,17 @@ export class Piece {
     * @param {PieceType} arg0
     */
     set kind(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(arg0);
         wasm.__wbg_set_piece_kind(this.__wbg_ptr, arg0);
     }
     /**
     * @returns {RotationState}
     */
     get rotation() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_piece_rotation(this.__wbg_ptr);
         return ret;
     }
@@ -1036,12 +1266,17 @@ export class Piece {
     * @param {RotationState} arg0
     */
     set rotation(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(arg0);
         wasm.__wbg_set_piece_rotation(this.__wbg_ptr, arg0);
     }
     /**
     * @returns {number}
     */
     get x() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_piece_x(this.__wbg_ptr);
         return ret >>> 0;
     }
@@ -1049,6 +1284,9 @@ export class Piece {
     * @param {number} arg0
     */
     set x(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(arg0);
         wasm.__wbg_set_piece_x(this.__wbg_ptr, arg0);
     }
     /**
@@ -1056,6 +1294,8 @@ export class Piece {
     * @returns {number}
     */
     get y() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_piece_y(this.__wbg_ptr);
         return ret >>> 0;
     }
@@ -1064,6 +1304,9 @@ export class Piece {
     * @param {number} arg0
     */
     set y(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(arg0);
         wasm.__wbg_set_piece_y(this.__wbg_ptr, arg0);
     }
 }
@@ -1106,6 +1349,9 @@ export class Queue {
     * @returns {QueueNode | undefined}
     */
     at(idx) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(idx);
         const ret = wasm.queue_at(this.__wbg_ptr, idx);
         return ret === 0 ? undefined : QueueNode.__wrap(ret);
     }
@@ -1114,6 +1360,9 @@ export class Queue {
     * @returns {number}
     */
     mut_at(idx) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(idx);
         const ret = wasm.queue_mut_at(this.__wbg_ptr, idx);
         return ret >>> 0;
     }
@@ -1121,7 +1370,12 @@ export class Queue {
     * @param {Queue} queue
     */
     append(queue) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(queue, Queue);
+        if (queue.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = queue.__destroy_into_raw();
         wasm.queue_append(this.__wbg_ptr, ptr0);
     }
@@ -1129,6 +1383,8 @@ export class Queue {
     * @param {any} node
     */
     pushBack(node) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         wasm.queue_pushBack(this.__wbg_ptr, addHeapObject(node));
     }
     /**
@@ -1136,7 +1392,9 @@ export class Queue {
     */
     popBack() {
         try {
+            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            _assertNum(this.__wbg_ptr);
             wasm.queue_popBack(retptr, this.__wbg_ptr);
             var r0 = getInt32Memory0()[retptr / 4 + 0];
             var r1 = getInt32Memory0()[retptr / 4 + 1];
@@ -1153,6 +1411,8 @@ export class Queue {
     * @param {any} node
     */
     pushFront(node) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         wasm.queue_pushFront(this.__wbg_ptr, addHeapObject(node));
     }
     /**
@@ -1160,7 +1420,9 @@ export class Queue {
     */
     popFront() {
         try {
+            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            _assertNum(this.__wbg_ptr);
             wasm.queue_popFront(retptr, this.__wbg_ptr);
             var r0 = getInt32Memory0()[retptr / 4 + 0];
             var r1 = getInt32Memory0()[retptr / 4 + 1];
@@ -1177,6 +1439,8 @@ export class Queue {
     * @returns {QueueNode}
     */
     head() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.queue_head(this.__wbg_ptr);
         return QueueNode.__wrap(ret);
     }
@@ -1194,12 +1458,17 @@ export class Queue {
     * @param {PieceColor} piece
     */
     insertPiece(piece) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(piece);
         wasm.queue_insertPiece(this.__wbg_ptr, piece);
     }
     /**
     * @returns {PieceColor | undefined}
     */
     takeNextPiece() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.queue_takeNextPiece(this.__wbg_ptr);
         return ret === 8 ? undefined : ret;
     }
@@ -1207,6 +1476,8 @@ export class Queue {
     * @returns {number}
     */
     len() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.queue_len(this.__wbg_ptr);
         return ret >>> 0;
     }
@@ -1242,6 +1513,8 @@ export class QueueNode {
     * @returns {QueueNodeType}
     */
     get node_type() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_queuenode_node_type(this.__wbg_ptr);
         return ret;
     }
@@ -1249,6 +1522,9 @@ export class QueueNode {
     * @param {QueueNodeType} arg0
     */
     set node_type(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(arg0);
         wasm.__wbg_set_queuenode_node_type(this.__wbg_ptr, arg0);
     }
     /**
@@ -1258,6 +1534,7 @@ export class QueueNode {
     * @param {any} next
     */
     constructor(node_type, choose, piece, next) {
+        _assertNum(node_type);
         const ret = wasm.queuenode_js_new(node_type, addHeapObject(choose), addHeapObject(piece), addHeapObject(next));
         this.__wbg_ptr = ret >>> 0;
         return this;
@@ -1266,6 +1543,8 @@ export class QueueNode {
     * @returns {any}
     */
     get choose() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.queuenode_js_choose(this.__wbg_ptr);
         return takeObject(ret);
     }
@@ -1273,6 +1552,8 @@ export class QueueNode {
     * @returns {PieceColor}
     */
     get piece() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.queuenode_piece(this.__wbg_ptr);
         return ret;
     }
@@ -1308,6 +1589,8 @@ export class TetBoard {
     * @returns {number}
     */
     get height() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_tetboard_height(this.__wbg_ptr);
         return ret;
     }
@@ -1315,12 +1598,17 @@ export class TetBoard {
     * @param {number} arg0
     */
     set height(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(arg0);
         wasm.__wbg_set_tetboard_height(this.__wbg_ptr, arg0);
     }
     /**
     * @returns {number}
     */
     get width() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_tetboard_width(this.__wbg_ptr);
         return ret;
     }
@@ -1328,6 +1616,9 @@ export class TetBoard {
     * @param {number} arg0
     */
     set width(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(arg0);
         wasm.__wbg_set_tetboard_width(this.__wbg_ptr, arg0);
     }
     /**
@@ -1343,6 +1634,10 @@ export class TetBoard {
     * @returns {boolean}
     */
     tileOccupied(x, y) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(x);
+        _assertNum(y);
         const ret = wasm.tetboard_tileOccupied(this.__wbg_ptr, x, y);
         return ret !== 0;
     }
@@ -1352,6 +1647,10 @@ export class TetBoard {
     * @returns {number}
     */
     getTile(x, y) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(x);
+        _assertNum(y);
         const ret = wasm.tetboard_getTile(this.__wbg_ptr, x, y);
         return ret;
     }
@@ -1361,6 +1660,11 @@ export class TetBoard {
     * @param {number} value
     */
     setTile(x, y, value) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(x);
+        _assertNum(y);
+        _assertNum(value);
         wasm.tetboard_setTile(this.__wbg_ptr, x, y, value);
     }
     /**
@@ -1368,6 +1672,10 @@ export class TetBoard {
     * @param {number} y
     */
     clearTile(x, y) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(x);
+        _assertNum(y);
         wasm.tetboard_clearTile(this.__wbg_ptr, x, y);
     }
     /**
@@ -1391,7 +1699,12 @@ export class TetBoard {
     * @returns {boolean}
     */
     doesCollide(piece) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(piece, TetPiece);
+        if (piece.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = piece.__destroy_into_raw();
         const ret = wasm.tetboard_doesCollide(this.__wbg_ptr, ptr0);
         return ret !== 0;
@@ -1401,7 +1714,12 @@ export class TetBoard {
     * @returns {boolean}
     */
     inBounds(pos) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(pos, Vec2);
+        if (pos.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = pos.__destroy_into_raw();
         const ret = wasm.tetboard_inBounds(this.__wbg_ptr, ptr0);
         return ret !== 0;
@@ -1412,7 +1730,13 @@ export class TetBoard {
     * @returns {boolean}
     */
     rotatePiece(piece, rotation) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(piece, TetPiece);
+        if (piece.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
+        _assertNum(rotation);
         const ret = wasm.tetboard_rotatePiece(this.__wbg_ptr, piece.__wbg_ptr, rotation);
         return ret !== 0;
     }
@@ -1423,7 +1747,14 @@ export class TetBoard {
     * @returns {number}
     */
     dasPiece(piece, direction, force) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(piece, TetPiece);
+        if (piece.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
+        _assertNum(direction);
+        _assertNum(force);
         const ret = wasm.tetboard_dasPiece(this.__wbg_ptr, piece.__wbg_ptr, direction, force);
         return ret;
     }
@@ -1432,7 +1763,12 @@ export class TetBoard {
     * @returns {boolean}
     */
     canPlace(piece) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(piece, TetPiece);
+        if (piece.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = piece.__destroy_into_raw();
         const ret = wasm.tetboard_canPlace(this.__wbg_ptr, ptr0);
         return ret !== 0;
@@ -1441,6 +1777,8 @@ export class TetBoard {
     * @returns {Uint8Array}
     */
     getTileArray() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.tetboard_getTileArray(this.__wbg_ptr);
         return takeObject(ret);
     }
@@ -1448,6 +1786,8 @@ export class TetBoard {
     * @returns {Array<any>}
     */
     getTileMatrix() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.tetboard_getTileMatrix(this.__wbg_ptr);
         return takeObject(ret);
     }
@@ -1457,7 +1797,13 @@ export class TetBoard {
     * @returns {boolean}
     */
     applyGravity(piece, force) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(piece, TetPiece);
+        if (piece.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
+        _assertNum(force);
         const ret = wasm.tetboard_applyGravity(this.__wbg_ptr, piece.__wbg_ptr, force);
         return ret !== 0;
     }
@@ -1467,7 +1813,13 @@ export class TetBoard {
     * @returns {boolean}
     */
     moveLeft(piece, amount) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(piece, TetPiece);
+        if (piece.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
+        _assertNum(amount);
         const ret = wasm.tetboard_moveLeft(this.__wbg_ptr, piece.__wbg_ptr, amount);
         return ret !== 0;
     }
@@ -1477,7 +1829,13 @@ export class TetBoard {
     * @returns {boolean}
     */
     moveRight(piece, amount) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(piece, TetPiece);
+        if (piece.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
+        _assertNum(amount);
         const ret = wasm.tetboard_moveRight(this.__wbg_ptr, piece.__wbg_ptr, amount);
         return ret !== 0;
     }
@@ -1486,7 +1844,9 @@ export class TetBoard {
     */
     get_filled_rows() {
         try {
+            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            _assertNum(this.__wbg_ptr);
             wasm.tetboard_get_filled_rows(retptr, this.__wbg_ptr);
             var r0 = getInt32Memory0()[retptr / 4 + 0];
             var r1 = getInt32Memory0()[retptr / 4 + 1];
@@ -1501,6 +1861,9 @@ export class TetBoard {
     * @param {number} row
     */
     clearRow(row) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(row);
         wasm.tetboard_clearRow(this.__wbg_ptr, row);
     }
     /**
@@ -1508,7 +1871,12 @@ export class TetBoard {
     * @returns {boolean}
     */
     unplace(piece) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(piece, TetPiece);
+        if (piece.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = piece.__destroy_into_raw();
         const ret = wasm.tetboard_unplace(this.__wbg_ptr, ptr0);
         return ret !== 0;
@@ -1517,6 +1885,8 @@ export class TetBoard {
     * @returns {boolean}
     */
     checkPC() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.tetboard_checkPC(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -1525,7 +1895,12 @@ export class TetBoard {
     * @returns {TSpinResult}
     */
     checkTSpin(piece) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(piece, TetPiece);
+        if (piece.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = piece.__destroy_into_raw();
         const ret = wasm.tetboard_checkTSpin(this.__wbg_ptr, ptr0);
         return ret;
@@ -1535,7 +1910,12 @@ export class TetBoard {
     * @returns {boolean}
     */
     place(piece) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(piece, TetPiece);
+        if (piece.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = piece.__destroy_into_raw();
         const ret = wasm.tetboard_place(this.__wbg_ptr, ptr0);
         return ret !== 0;
@@ -1545,7 +1925,12 @@ export class TetBoard {
     * @returns {ClearStruct}
     */
     placeNClear(piece) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(piece, TetPiece);
+        if (piece.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = piece.__destroy_into_raw();
         const ret = wasm.tetboard_placeNClear(this.__wbg_ptr, ptr0);
         return ClearStruct.__wrap(ret);
@@ -1574,6 +1959,8 @@ export class TetFumen {
     * @returns {boolean}
     */
     get guideline() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_tetfumen_guideline(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -1581,6 +1968,9 @@ export class TetFumen {
     * @param {boolean} arg0
     */
     set guideline(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertBoolean(arg0);
         wasm.__wbg_set_tetfumen_guideline(this.__wbg_ptr, arg0);
     }
     /**
@@ -1594,12 +1984,16 @@ export class TetFumen {
     * @returns {number}
     */
     addPage() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.tetfumen_addPage(this.__wbg_ptr);
         return ret >>> 0;
     }
     /**
     */
     update() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         wasm.tetfumen_update(this.__wbg_ptr);
     }
     /**
@@ -1609,7 +2003,9 @@ export class TetFumen {
         let deferred1_0;
         let deferred1_1;
         try {
+            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            _assertNum(this.__wbg_ptr);
             wasm.tetfumen_encodeFumen(retptr, this.__wbg_ptr);
             var r0 = getInt32Memory0()[retptr / 4 + 0];
             var r1 = getInt32Memory0()[retptr / 4 + 1];
@@ -1625,6 +2021,8 @@ export class TetFumen {
     * @param {string} fumen
     */
     decodeFumen(fumen) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ptr0 = passStringToWasm0(fumen, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         wasm.tetfumen_decodeFumen(this.__wbg_ptr, ptr0, len0);
@@ -1634,6 +2032,9 @@ export class TetFumen {
     * @returns {number}
     */
     getPageAt(idx) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(idx);
         const ret = wasm.tetfumen_getPageAt(this.__wbg_ptr, idx);
         return ret >>> 0;
     }
@@ -1645,6 +2046,10 @@ const TetPageFinalization = (typeof FinalizationRegistry === 'undefined')
 /**
 */
 export class TetPage {
+
+    constructor() {
+        throw new Error('cannot invoke `new` directly');
+    }
 
     static __wrap(ptr) {
         ptr = ptr >>> 0;
@@ -1669,6 +2074,8 @@ export class TetPage {
     * @returns {boolean}
     */
     get rise() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_tetpage_rise(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -1676,12 +2083,17 @@ export class TetPage {
     * @param {boolean} arg0
     */
     set rise(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertBoolean(arg0);
         wasm.__wbg_set_tetpage_rise(this.__wbg_ptr, arg0);
     }
     /**
     * @returns {boolean}
     */
     get lock() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_tetpage_lock(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -1689,12 +2101,17 @@ export class TetPage {
     * @param {boolean} arg0
     */
     set lock(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertBoolean(arg0);
         wasm.__wbg_set_tetpage_lock(this.__wbg_ptr, arg0);
     }
     /**
     * @returns {boolean}
     */
     get mirror() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_tetpage_mirror(this.__wbg_ptr);
         return ret !== 0;
     }
@@ -1702,25 +2119,39 @@ export class TetPage {
     * @param {boolean} arg0
     */
     set mirror(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertBoolean(arg0);
         wasm.__wbg_set_tetpage_mirror(this.__wbg_ptr, arg0);
     }
     /**
     * @param {PieceColor} c
     */
     set piece_color(c) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(c);
         wasm.tetpage_set_piece_color(this.__wbg_ptr, c);
     }
     /**
     * @param {Direction} dir
     */
     set piece_rotation(dir) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(dir);
         wasm.tetpage_set_piece_rotation(this.__wbg_ptr, dir);
     }
     /**
     * @param {Vec2} pos
     */
     set piece_position(pos) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(pos, Vec2);
+        if (pos.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = pos.__destroy_into_raw();
         wasm.tetpage_set_piece_position(this.__wbg_ptr, ptr0);
     }
@@ -1728,7 +2159,12 @@ export class TetPage {
     * @param {Field} field
     */
     set_field(field) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(field, Field);
+        if (field.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = field.__destroy_into_raw();
         wasm.tetpage_set_field(this.__wbg_ptr, ptr0);
     }
@@ -1736,6 +2172,8 @@ export class TetPage {
     * @param {string | undefined} [comment]
     */
     set comment(comment) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         var ptr0 = isLikeNone(comment) ? 0 : passStringToWasm0(comment, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         var len0 = WASM_VECTOR_LEN;
         wasm.tetpage_set_comment(this.__wbg_ptr, ptr0, len0);
@@ -1744,6 +2182,8 @@ export class TetPage {
     * @returns {number}
     */
     get field() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.tetpage_field(this.__wbg_ptr);
         return ret >>> 0;
     }
@@ -1751,6 +2191,8 @@ export class TetPage {
     * @returns {number}
     */
     get fumen_page() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.tetpage_fumen_page(this.__wbg_ptr);
         return ret >>> 0;
     }
@@ -1759,7 +2201,9 @@ export class TetPage {
     */
     get comment() {
         try {
+            if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            _assertNum(this.__wbg_ptr);
             wasm.tetpage_comment(retptr, this.__wbg_ptr);
             var r0 = getInt32Memory0()[retptr / 4 + 0];
             var r1 = getInt32Memory0()[retptr / 4 + 1];
@@ -1779,6 +2223,9 @@ export class TetPage {
     */
     static from_fumen_page(pg) {
         _assertClass(pg, Page);
+        if (pg.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = pg.__destroy_into_raw();
         const ret = wasm.tetpage_from_fumen_page(ptr0);
         return TetPage.__wrap(ret);
@@ -1815,6 +2262,8 @@ export class TetPiece {
     * @returns {Direction}
     */
     get rotation() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_tetpiece_rotation(this.__wbg_ptr);
         return ret;
     }
@@ -1822,12 +2271,17 @@ export class TetPiece {
     * @param {Direction} arg0
     */
     set rotation(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(arg0);
         wasm.__wbg_set_tetpiece_rotation(this.__wbg_ptr, arg0);
     }
     /**
     * @returns {Vec2}
     */
     get position() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_tetpiece_position(this.__wbg_ptr);
         return Vec2.__wrap(ret);
     }
@@ -1835,7 +2289,12 @@ export class TetPiece {
     * @param {Vec2} arg0
     */
     set position(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         _assertClass(arg0, Vec2);
+        if (arg0.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = arg0.__destroy_into_raw();
         wasm.__wbg_set_tetpiece_position(this.__wbg_ptr, ptr0);
     }
@@ -1845,7 +2304,12 @@ export class TetPiece {
     * @param {Vec2} position
     */
     constructor(color, rotation, position) {
+        _assertNum(color);
+        _assertNum(rotation);
         _assertClass(position, Vec2);
+        if (position.__wbg_ptr === 0) {
+            throw new Error('Attempt to use a moved value');
+        }
         var ptr0 = position.__destroy_into_raw();
         const ret = wasm.tetpiece_new(color, rotation, ptr0);
         this.__wbg_ptr = ret >>> 0;
@@ -1904,12 +2368,17 @@ export class TetPiece {
     * @param {number} force
     */
     applyGravity(force) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(force);
         wasm.tetpiece_applyGravity(this.__wbg_ptr, force);
     }
     /**
     * @returns {TetPiece}
     */
     clone() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.tetpiece_clone(this.__wbg_ptr);
         return TetPiece.__wrap(ret);
     }
@@ -1917,19 +2386,27 @@ export class TetPiece {
     * @param {number} amount
     */
     moveLeft(amount) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(amount);
         wasm.tetpiece_moveLeft(this.__wbg_ptr, amount);
     }
     /**
     * @param {number} amount
     */
     moveRight(amount) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(amount);
         wasm.tetpiece_moveRight(this.__wbg_ptr, amount);
     }
     /**
     * @returns {Array<any>}
     */
     getRawMinos() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
+        _assertNum(ptr);
         const ret = wasm.tetpiece_getRawMinos(ptr);
         return takeObject(ret);
     }
@@ -1937,7 +2414,9 @@ export class TetPiece {
     * @returns {Array<any>}
     */
     getMinos() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
         const ptr = this.__destroy_into_raw();
+        _assertNum(ptr);
         const ret = wasm.tetpiece_getMinos(ptr);
         return takeObject(ret);
     }
@@ -1945,6 +2424,8 @@ export class TetPiece {
     * @returns {PieceColor}
     */
     get color() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.tetpiece_color(this.__wbg_ptr);
         return ret;
     }
@@ -1952,6 +2433,9 @@ export class TetPiece {
     * @param {PieceColor} color
     */
     set color(color) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(color);
         wasm.tetpiece_set_color(this.__wbg_ptr, color);
     }
 }
@@ -1986,6 +2470,8 @@ export class Vec2 {
     * @returns {number}
     */
     get 0() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_vec2_0(this.__wbg_ptr);
         return ret;
     }
@@ -1993,12 +2479,17 @@ export class Vec2 {
     * @param {number} arg0
     */
     set 0(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(arg0);
         wasm.__wbg_set_vec2_0(this.__wbg_ptr, arg0);
     }
     /**
     * @returns {number}
     */
     get 1() {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
         const ret = wasm.__wbg_get_vec2_1(this.__wbg_ptr);
         return ret;
     }
@@ -2006,6 +2497,9 @@ export class Vec2 {
     * @param {number} arg0
     */
     set 1(arg0) {
+        if (this.__wbg_ptr == 0) throw new Error('Attempt to use a moved value');
+        _assertNum(this.__wbg_ptr);
+        _assertNum(arg0);
         wasm.__wbg_set_vec2_1(this.__wbg_ptr, arg0);
     }
     /**
@@ -2013,6 +2507,8 @@ export class Vec2 {
     * @param {number} y
     */
     constructor(x, y) {
+        _assertNum(x);
+        _assertNum(y);
         const ret = wasm.vec2_new(x, y);
         this.__wbg_ptr = ret >>> 0;
         return this;
@@ -2036,6 +2532,10 @@ const u64_boardFinalization = (typeof FinalizationRegistry === 'undefined')
 *
 */
 export class u64_board {
+
+    constructor() {
+        throw new Error('cannot invoke `new` directly');
+    }
 
     __destroy_into_raw() {
         const ptr = this.__wbg_ptr;
@@ -2084,20 +2584,28 @@ async function __wbg_load(module, imports) {
 function __wbg_get_imports() {
     const imports = {};
     imports.wbg = {};
-    imports.wbg.__wbindgen_object_drop_ref = function(arg0) {
-        takeObject(arg0);
-    };
-    imports.wbg.__wbindgen_number_new = function(arg0) {
-        const ret = arg0;
+    imports.wbg.__wbindgen_error_new = function(arg0, arg1) {
+        const ret = new Error(getStringFromWasm0(arg0, arg1));
         return addHeapObject(ret);
+    };
+    imports.wbg.__wbindgen_is_undefined = function(arg0) {
+        const ret = getObject(arg0) === undefined;
+        _assertBoolean(ret);
+        return ret;
+    };
+    imports.wbg.__wbindgen_in = function(arg0, arg1) {
+        const ret = getObject(arg0) in getObject(arg1);
+        _assertBoolean(ret);
+        return ret;
     };
     imports.wbg.__wbindgen_boolean_get = function(arg0) {
         const v = getObject(arg0);
         const ret = typeof(v) === 'boolean' ? (v ? 1 : 0) : 2;
+        _assertNum(ret);
         return ret;
     };
-    imports.wbg.__wbg_vec2_new = function(arg0) {
-        const ret = Vec2.__wrap(arg0);
+    imports.wbg.__wbindgen_number_new = function(arg0) {
+        const ret = arg0;
         return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_string_get = function(arg0, arg1) {
@@ -2108,136 +2616,103 @@ function __wbg_get_imports() {
         getInt32Memory0()[arg0 / 4 + 1] = len1;
         getInt32Memory0()[arg0 / 4 + 0] = ptr1;
     };
-    imports.wbg.__wbindgen_is_string = function(arg0) {
-        const ret = typeof(getObject(arg0)) === 'string';
+    imports.wbg.__wbindgen_is_bigint = function(arg0) {
+        const ret = typeof(getObject(arg0)) === 'bigint';
+        _assertBoolean(ret);
         return ret;
     };
     imports.wbg.__wbindgen_is_object = function(arg0) {
         const val = getObject(arg0);
         const ret = typeof(val) === 'object' && val !== null;
+        _assertBoolean(ret);
         return ret;
     };
-    imports.wbg.__wbindgen_is_undefined = function(arg0) {
-        const ret = getObject(arg0) === undefined;
+    imports.wbg.__wbindgen_is_string = function(arg0) {
+        const ret = typeof(getObject(arg0)) === 'string';
+        _assertBoolean(ret);
         return ret;
     };
-    imports.wbg.__wbindgen_in = function(arg0, arg1) {
-        const ret = getObject(arg0) in getObject(arg1);
-        return ret;
-    };
-    imports.wbg.__wbindgen_is_bigint = function(arg0) {
-        const ret = typeof(getObject(arg0)) === 'bigint';
+    imports.wbg.__wbindgen_jsval_eq = function(arg0, arg1) {
+        const ret = getObject(arg0) === getObject(arg1);
+        _assertBoolean(ret);
         return ret;
     };
     imports.wbg.__wbindgen_bigint_from_u64 = function(arg0) {
         const ret = BigInt.asUintN(64, arg0);
         return addHeapObject(ret);
     };
-    imports.wbg.__wbindgen_jsval_eq = function(arg0, arg1) {
-        const ret = getObject(arg0) === getObject(arg1);
-        return ret;
-    };
-    imports.wbg.__wbindgen_error_new = function(arg0, arg1) {
-        const ret = new Error(getStringFromWasm0(arg0, arg1));
+    imports.wbg.__wbg_vec2_new = function() { return logError(function (arg0) {
+        const ret = Vec2.__wrap(arg0);
         return addHeapObject(ret);
-    };
-    imports.wbg.__wbindgen_jsval_loose_eq = function(arg0, arg1) {
-        const ret = getObject(arg0) == getObject(arg1);
-        return ret;
-    };
+    }, arguments) };
     imports.wbg.__wbindgen_number_get = function(arg0, arg1) {
         const obj = getObject(arg1);
         const ret = typeof(obj) === 'number' ? obj : undefined;
+        if (!isLikeNone(ret)) {
+            _assertNum(ret);
+        }
         getFloat64Memory0()[arg0 / 8 + 1] = isLikeNone(ret) ? 0 : ret;
         getInt32Memory0()[arg0 / 4 + 0] = !isLikeNone(ret);
-    };
-    imports.wbg.__wbindgen_object_clone_ref = function(arg0) {
-        const ret = getObject(arg0);
-        return addHeapObject(ret);
     };
     imports.wbg.__wbindgen_string_new = function(arg0, arg1) {
         const ret = getStringFromWasm0(arg0, arg1);
         return addHeapObject(ret);
     };
-    imports.wbg.__wbg_getwithrefkey_15c62c2b8546208d = function(arg0, arg1) {
+    imports.wbg.__wbindgen_jsval_loose_eq = function(arg0, arg1) {
+        const ret = getObject(arg0) == getObject(arg1);
+        _assertBoolean(ret);
+        return ret;
+    };
+    imports.wbg.__wbindgen_object_clone_ref = function(arg0) {
+        const ret = getObject(arg0);
+        return addHeapObject(ret);
+    };
+    imports.wbg.__wbg_getwithrefkey_15c62c2b8546208d = function() { return logError(function (arg0, arg1) {
         const ret = getObject(arg0)[getObject(arg1)];
         return addHeapObject(ret);
-    };
-    imports.wbg.__wbg_set_20cbc34131e76824 = function(arg0, arg1, arg2) {
+    }, arguments) };
+    imports.wbg.__wbg_set_20cbc34131e76824 = function() { return logError(function (arg0, arg1, arg2) {
         getObject(arg0)[takeObject(arg1)] = takeObject(arg2);
-    };
-    imports.wbg.__wbg_decodefumenerror_new = function(arg0) {
-        const ret = DecodeFumenError.__wrap(arg0);
-        return addHeapObject(ret);
-    };
-    imports.wbg.__wbg_page_new = function(arg0) {
+    }, arguments) };
+    imports.wbg.__wbg_page_new = function() { return logError(function (arg0) {
         const ret = Page.__wrap(arg0);
         return addHeapObject(ret);
-    };
-    imports.wbg.__wbg_get_0ee8ea3c7c984c45 = function(arg0, arg1) {
-        const ret = getObject(arg0)[arg1 >>> 0];
+    }, arguments) };
+    imports.wbg.__wbg_decodefumenerror_new = function() { return logError(function (arg0) {
+        const ret = DecodeFumenError.__wrap(arg0);
         return addHeapObject(ret);
-    };
-    imports.wbg.__wbg_length_161c0d89c6535c1d = function(arg0) {
-        const ret = getObject(arg0).length;
-        return ret;
-    };
-    imports.wbg.__wbg_new_75208e29bddfd88c = function() {
+    }, arguments) };
+    imports.wbg.__wbg_new_75208e29bddfd88c = function() { return logError(function () {
         const ret = new Array();
         return addHeapObject(ret);
-    };
-    imports.wbg.__wbindgen_is_function = function(arg0) {
-        const ret = typeof(getObject(arg0)) === 'function';
-        return ret;
-    };
-    imports.wbg.__wbg_next_586204376d2ed373 = function(arg0) {
-        const ret = getObject(arg0).next;
-        return addHeapObject(ret);
-    };
-    imports.wbg.__wbg_next_b2d3366343a208b3 = function() { return handleError(function (arg0) {
-        const ret = getObject(arg0).next();
+    }, arguments) };
+    imports.wbg.__wbg_get_0ee8ea3c7c984c45 = function() { return logError(function (arg0, arg1) {
+        const ret = getObject(arg0)[arg1 >>> 0];
         return addHeapObject(ret);
     }, arguments) };
-    imports.wbg.__wbg_done_90b14d6f6eacc42f = function(arg0) {
-        const ret = getObject(arg0).done;
-        return ret;
-    };
-    imports.wbg.__wbg_value_3158be908c80a75e = function(arg0) {
-        const ret = getObject(arg0).value;
-        return addHeapObject(ret);
-    };
-    imports.wbg.__wbg_iterator_40027cdd598da26b = function() {
-        const ret = Symbol.iterator;
-        return addHeapObject(ret);
-    };
-    imports.wbg.__wbg_get_3fddfed2c83f434c = function() { return handleError(function (arg0, arg1) {
-        const ret = Reflect.get(getObject(arg0), getObject(arg1));
-        return addHeapObject(ret);
-    }, arguments) };
-    imports.wbg.__wbg_call_3f093dd26d5569f8 = function() { return handleError(function (arg0, arg1) {
-        const ret = getObject(arg0).call(getObject(arg1));
-        return addHeapObject(ret);
-    }, arguments) };
-    imports.wbg.__wbg_new_632630b5cec17f21 = function() {
-        const ret = new Object();
-        return addHeapObject(ret);
-    };
-    imports.wbg.__wbg_set_79c308ecd9a1d091 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbg_set_79c308ecd9a1d091 = function() { return logError(function (arg0, arg1, arg2) {
         getObject(arg0)[arg1 >>> 0] = takeObject(arg2);
-    };
-    imports.wbg.__wbg_from_58c79ccfb68060f5 = function(arg0) {
+    }, arguments) };
+    imports.wbg.__wbg_from_58c79ccfb68060f5 = function() { return logError(function (arg0) {
         const ret = Array.from(getObject(arg0));
         return addHeapObject(ret);
-    };
-    imports.wbg.__wbg_isArray_e783c41d0dd19b44 = function(arg0) {
+    }, arguments) };
+    imports.wbg.__wbg_isArray_e783c41d0dd19b44 = function() { return logError(function (arg0) {
         const ret = Array.isArray(getObject(arg0));
+        _assertBoolean(ret);
         return ret;
-    };
-    imports.wbg.__wbg_push_0239ee92f127e807 = function(arg0, arg1) {
+    }, arguments) };
+    imports.wbg.__wbg_length_161c0d89c6535c1d = function() { return logError(function (arg0) {
+        const ret = getObject(arg0).length;
+        _assertNum(ret);
+        return ret;
+    }, arguments) };
+    imports.wbg.__wbg_push_0239ee92f127e807 = function() { return logError(function (arg0, arg1) {
         const ret = getObject(arg0).push(getObject(arg1));
+        _assertNum(ret);
         return ret;
-    };
-    imports.wbg.__wbg_instanceof_ArrayBuffer_9221fa854ffb71b5 = function(arg0) {
+    }, arguments) };
+    imports.wbg.__wbg_instanceof_ArrayBuffer_9221fa854ffb71b5 = function() { return logError(function (arg0) {
         let result;
         try {
             result = getObject(arg0) instanceof ArrayBuffer;
@@ -2245,36 +2720,48 @@ function __wbg_get_imports() {
             result = false;
         }
         const ret = result;
+        _assertBoolean(ret);
         return ret;
-    };
-    imports.wbg.__wbg_isSafeInteger_a23a66ee7c41b273 = function(arg0) {
+    }, arguments) };
+    imports.wbg.__wbg_call_3f093dd26d5569f8 = function() { return handleError(function (arg0, arg1) {
+        const ret = getObject(arg0).call(getObject(arg1));
+        return addHeapObject(ret);
+    }, arguments) };
+    imports.wbg.__wbg_next_b2d3366343a208b3 = function() { return handleError(function (arg0) {
+        const ret = getObject(arg0).next();
+        return addHeapObject(ret);
+    }, arguments) };
+    imports.wbg.__wbg_next_586204376d2ed373 = function() { return logError(function (arg0) {
+        const ret = getObject(arg0).next;
+        return addHeapObject(ret);
+    }, arguments) };
+    imports.wbg.__wbg_done_90b14d6f6eacc42f = function() { return logError(function (arg0) {
+        const ret = getObject(arg0).done;
+        _assertBoolean(ret);
+        return ret;
+    }, arguments) };
+    imports.wbg.__wbg_value_3158be908c80a75e = function() { return logError(function (arg0) {
+        const ret = getObject(arg0).value;
+        return addHeapObject(ret);
+    }, arguments) };
+    imports.wbg.__wbg_isSafeInteger_a23a66ee7c41b273 = function() { return logError(function (arg0) {
         const ret = Number.isSafeInteger(getObject(arg0));
+        _assertBoolean(ret);
         return ret;
-    };
-    imports.wbg.__wbg_entries_488960b196cfb6a5 = function(arg0) {
+    }, arguments) };
+    imports.wbg.__wbg_entries_488960b196cfb6a5 = function() { return logError(function (arg0) {
         const ret = Object.entries(getObject(arg0));
         return addHeapObject(ret);
-    };
-    imports.wbg.__wbg_buffer_b914fb8b50ebbc3e = function(arg0) {
-        const ret = getObject(arg0).buffer;
+    }, arguments) };
+    imports.wbg.__wbg_new_632630b5cec17f21 = function() { return logError(function () {
+        const ret = new Object();
         return addHeapObject(ret);
-    };
-    imports.wbg.__wbg_newwithbyteoffsetandlength_0de9ee56e9f6ee6e = function(arg0, arg1, arg2) {
-        const ret = new Uint8Array(getObject(arg0), arg1 >>> 0, arg2 >>> 0);
+    }, arguments) };
+    imports.wbg.__wbg_iterator_40027cdd598da26b = function() { return logError(function () {
+        const ret = Symbol.iterator;
         return addHeapObject(ret);
-    };
-    imports.wbg.__wbg_new_b1f2d6842d615181 = function(arg0) {
-        const ret = new Uint8Array(getObject(arg0));
-        return addHeapObject(ret);
-    };
-    imports.wbg.__wbg_set_7d988c98e6ced92d = function(arg0, arg1, arg2) {
-        getObject(arg0).set(getObject(arg1), arg2 >>> 0);
-    };
-    imports.wbg.__wbg_length_21c4b0ae73cba59d = function(arg0) {
-        const ret = getObject(arg0).length;
-        return ret;
-    };
-    imports.wbg.__wbg_instanceof_Uint8Array_c299a4ee232e76ba = function(arg0) {
+    }, arguments) };
+    imports.wbg.__wbg_instanceof_Uint8Array_c299a4ee232e76ba = function() { return logError(function (arg0) {
         let result;
         try {
             result = getObject(arg0) instanceof Uint8Array;
@@ -2282,20 +2769,56 @@ function __wbg_get_imports() {
             result = false;
         }
         const ret = result;
+        _assertBoolean(ret);
+        return ret;
+    }, arguments) };
+    imports.wbg.__wbg_new_b1f2d6842d615181 = function() { return logError(function (arg0) {
+        const ret = new Uint8Array(getObject(arg0));
+        return addHeapObject(ret);
+    }, arguments) };
+    imports.wbg.__wbg_newwithbyteoffsetandlength_0de9ee56e9f6ee6e = function() { return logError(function (arg0, arg1, arg2) {
+        const ret = new Uint8Array(getObject(arg0), arg1 >>> 0, arg2 >>> 0);
+        return addHeapObject(ret);
+    }, arguments) };
+    imports.wbg.__wbg_length_21c4b0ae73cba59d = function() { return logError(function (arg0) {
+        const ret = getObject(arg0).length;
+        _assertNum(ret);
+        return ret;
+    }, arguments) };
+    imports.wbg.__wbg_set_7d988c98e6ced92d = function() { return logError(function (arg0, arg1, arg2) {
+        getObject(arg0).set(getObject(arg1), arg2 >>> 0);
+    }, arguments) };
+    imports.wbg.__wbindgen_is_function = function(arg0) {
+        const ret = typeof(getObject(arg0)) === 'function';
+        _assertBoolean(ret);
         return ret;
     };
-    imports.wbg.__wbindgen_bigint_get_as_i64 = function(arg0, arg1) {
-        const v = getObject(arg1);
-        const ret = typeof(v) === 'bigint' ? v : undefined;
-        getBigInt64Memory0()[arg0 / 8 + 1] = isLikeNone(ret) ? BigInt(0) : ret;
-        getInt32Memory0()[arg0 / 4 + 0] = !isLikeNone(ret);
-    };
+    imports.wbg.__wbg_get_3fddfed2c83f434c = function() { return handleError(function (arg0, arg1) {
+        const ret = Reflect.get(getObject(arg0), getObject(arg1));
+        return addHeapObject(ret);
+    }, arguments) };
+    imports.wbg.__wbg_buffer_b914fb8b50ebbc3e = function() { return logError(function (arg0) {
+        const ret = getObject(arg0).buffer;
+        return addHeapObject(ret);
+    }, arguments) };
     imports.wbg.__wbindgen_debug_string = function(arg0, arg1) {
         const ret = debugString(getObject(arg1));
         const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len1 = WASM_VECTOR_LEN;
         getInt32Memory0()[arg0 / 4 + 1] = len1;
         getInt32Memory0()[arg0 / 4 + 0] = ptr1;
+    };
+    imports.wbg.__wbindgen_bigint_get_as_i64 = function(arg0, arg1) {
+        const v = getObject(arg1);
+        const ret = typeof(v) === 'bigint' ? v : undefined;
+        if (!isLikeNone(ret)) {
+            _assertBigInt(ret);
+        }
+        getBigInt64Memory0()[arg0 / 8 + 1] = isLikeNone(ret) ? BigInt(0) : ret;
+        getInt32Memory0()[arg0 / 4 + 0] = !isLikeNone(ret);
+    };
+    imports.wbg.__wbindgen_object_drop_ref = function(arg0) {
+        takeObject(arg0);
     };
     imports.wbg.__wbindgen_throw = function(arg0, arg1) {
         throw new Error(getStringFromWasm0(arg0, arg1));

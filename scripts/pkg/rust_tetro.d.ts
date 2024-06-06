@@ -32,11 +32,14 @@ export function direction_to_i32(dir: Direction): number;
 export function direction_to_i64(dir: Direction): bigint;
 /**
 */
-export enum Direction {
-  North = 0,
-  East = 1,
-  South = 2,
-  West = 3,
+export enum PieceType {
+  I = 1,
+  L = 2,
+  O = 3,
+  Z = 4,
+  T = 5,
+  J = 6,
+  S = 7,
 }
 /**
 */
@@ -47,14 +50,17 @@ export enum TSpinResult {
 }
 /**
 */
-export enum PieceType {
-  I = 1,
-  L = 2,
-  O = 3,
-  Z = 4,
-  T = 5,
-  J = 6,
-  S = 7,
+export enum Direction {
+  North = 0,
+  East = 1,
+  South = 2,
+  West = 3,
+}
+/**
+*/
+export enum QueueNodeType {
+  Choose = 0,
+  Piece = 1,
 }
 /**
 */
@@ -70,20 +76,6 @@ export enum PieceColor {
 }
 /**
 */
-export enum QueueNodeType {
-  Choose = 0,
-  Piece = 1,
-}
-/**
-*/
-export enum RotationState {
-  South = 0,
-  East = 1,
-  North = 2,
-  West = 3,
-}
-/**
-*/
 export enum CellColor {
   Empty = 0,
   I = 1,
@@ -94,6 +86,14 @@ export enum CellColor {
   J = 6,
   S = 7,
   Grey = 8,
+}
+/**
+*/
+export enum RotationState {
+  South = 0,
+  East = 1,
+  North = 2,
+  West = 3,
 }
 /**
 *
