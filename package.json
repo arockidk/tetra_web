@@ -6,8 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "clear_tet_lib": "rm -rf rust_tetro/ && rm -rf dist/scripts/pkg",
-    "get_tet_lib": "git clone https://github.com/arockidk/rust_tetro.git && cd ./rust_tetro && wasm-pack build --target web && cp -r ./pkg ../dist/scripts/pkg && cd .. ",
-    "get_local_lib" : "cp -r ../../../dev/chrome-tris/bettersfinder/rust_tetro . && cd ./rust_tetro && wasm-pack build --target web && cp -r ./pkg ../dist/scripts/pkg && cd .. ",
+    "get_tet_lib": "git clone https://github.com/arockidk/rust_tetro.git && cd ./rust_tetro && wasm-pack build --dev --target web && cp -r ./pkg ../dist/scripts/pkg && cd .. ",
+    "get_local_lib" : "cp -r ../../../dev/chrome-tris/bettersfinder/rust_tetro . && cd ./rust_tetro && wasm-pack build --dev --target web && cp -r ./pkg ../dist/scripts/pkg && cd .. ",
     "update_tet_lib": "npm run clear_tet_lib && npm run get_tet_lib ",
     "update_local_lib": "npm run clear_tet_lib && npm run get_local_lib",
     "dev": "dev.bat"
