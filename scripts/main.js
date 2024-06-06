@@ -1,4 +1,4 @@
-import init, * as tet from "/scripts/pkg/rust_tetro.js";
+import init, * as tet from "./scripts/pkg/rust_tetro.js";
 window.addEventListener("keydown", function (e) {
     if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].indexOf(e.code) > -1) {
         e.preventDefault();
