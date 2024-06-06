@@ -5,6 +5,5 @@ rust_tetro/
 package-lock.json
 transform_spritesheet.py
 dist/scripts/
-dist/pixi.min.js
 dist/*.wasm
 .vscode/
