@@ -1,6 +1,6 @@
 
 import { accessibilityTarget } from "pixi.js";
-import init, * as tet from "/scripts/pkg/rust_tetro.js"
+import init, * as tet from "./scripts/pkg/rust_tetro.js";
 import { container } from "webpack";
 import { createTextSpanFromBounds } from "typescript";
 window.addEventListener("keydown", function(e) {
