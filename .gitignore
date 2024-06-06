@@ -7,3 +7,4 @@ transform_spritesheet.py
 dist/scripts/
 dist/pixi.min.js
 dist/*.wasm
+.vscode/
