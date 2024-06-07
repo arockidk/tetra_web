@@ -43,6 +43,19 @@ export enum PieceType {
 }
 /**
 */
+export enum CellColor {
+  Empty = 0,
+  I = 1,
+  L = 2,
+  O = 3,
+  Z = 4,
+  T = 5,
+  J = 6,
+  S = 7,
+  Grey = 8,
+}
+/**
+*/
 export enum TSpinResult {
   NoSpin = 0,
   MiniSpin = 1,
@@ -58,12 +71,6 @@ export enum Direction {
 }
 /**
 */
-export enum QueueNodeType {
-  Choose = 0,
-  Piece = 1,
-}
-/**
-*/
 export enum PieceColor {
   B = 0,
   I = 1,
@@ -76,16 +83,9 @@ export enum PieceColor {
 }
 /**
 */
-export enum CellColor {
-  Empty = 0,
-  I = 1,
-  L = 2,
-  O = 3,
-  Z = 4,
-  T = 5,
-  J = 6,
-  S = 7,
-  Grey = 8,
+export enum QueueNodeType {
+  Choose = 0,
+  Piece = 1,
 }
 /**
 */
