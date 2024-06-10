@@ -1,0 +1,40 @@
+@font-face {
+    font-family: Renogare;
+    src: url(assets/Renogare-Regular.otf);
+}
+:root {
+    --color-a: #315d90;
+    --color-a-dark: #284567;
+    --grey: #a3a6b3;
+    font-family: Renogare;
+    color: white;
+}
+body {
+    margin: 0;
+}
+#topbar { 
+    clear: both;
+    background-color: var(--color-a);
+    color: var(--grey);
+    height: 60px;
+    width: 100%;
+    text-align: center;
+    margin: 0 auto;
+    font-size: 30px;
+}
+#game {
+    width: 50%;
+    margin: 0 25%;
+    height: 550px;
+    border: 2px solid var(--grey);
+}
+#info {
+    color: var(--grey);
+    text-align: center;
+}
+#main {
+    width: 50%;
+    height: 700px;
+    background-color: var(--color-a-dark);
+    margin: auto;
+}
