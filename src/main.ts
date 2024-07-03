@@ -1,13 +1,14 @@
 
 import { accessibilityTarget } from "pixi.js";
-import init, * as tet from "./scripts/pkg/rust_tetro.js";
+import init, * as tet from "./pkg/rust_tetro.js";
 import { container } from "webpack";
 import { createTextSpanFromBounds } from "typescript";
 window.addEventListener("keydown", function(e) {
-    if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
+    if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1 && document.activeElement?.tagName !== "INPUT") {
+        // console.log(this.document.activeElement?.tagName);
         e.preventDefault();
     }
-}, false);
+});
 interface MinoRenderInfo {
     height: number;
     width: number;
@@ -15,6 +16,28 @@ interface MinoRenderInfo {
     borderColor: string;
     borderWidth: number;
 }
+let TILE_COLOR_MAP = [
+    "B",
+    "I",
+    "L",
+    "O",
+    "Z",
+    "T",
+    "J",
+    "S",
+    "G"
+]
+// let TILE_COLOR_MAP = {
+//     "B": 0,
+//     "I": 1,
+//     "L": 2,
+//     "O": 3,
+//     "Z": 4,
+//     "T": 5,
+//     "J": 6,
+//     "S": 7,
+//     "G": 8
+// }
 class MinoGrid {
     // #region Properties
     private _minos: tet.PieceColor[][];
@@ -185,6 +208,9 @@ class FieldWrapper {
         this.field.dasPiece(dir, amount);
     }
     public rotatePiece(dir: number) {
+        if (this.field.active_piece?.color == tet.PieceColor.O) {
+            return;
+        }
         this.field.rotatePiece(dir);
     }
     public setTile(x: number, y: number, v: number) {
@@ -218,6 +244,13 @@ class FieldWrapper {
         this.field.hold = piece;
     }
     public placeActivePiece(): boolean {
+        if (this._field.active_piece) {
+            for (let mino of this._field.active_piece.getMinos()) {
+                if (mino[1] > 23) { 
+                    return false;
+                }
+            }
+        }
         return this._field.place_active_piece();
     }
     public placeNClearActivePiece(): tet.ClearStruct {
@@ -356,53 +389,72 @@ function generate_queue(): tet.Queue {
     return q;
 
 }
-interface Game {
-    field: FieldWrapper;
-    fieldGrid: MinoGrid;
-    inputs: {
-        left: Key,
-        right: Key,
-        softDrop: Key,
-        hardDrop: Key,
+interface Input {
+    left: Key,
+    right: Key,
+    softDrop: Key,
+    hardDrop: Key,
 
-        cw: Key,
-        ccw: Key,
-        hold: Key,
-        flip: Key,
-        reset: Key
-    };
-    queue: tet.Queue;
-    queueDisplay: PieceDisplay[];
-    holdDisplay: PieceDisplay;
+    cw: Key,
+    ccw: Key,
+    hold: Key,
+    flip: Key,
+    reset: Key,
+    
+    currentInputDirection: number;
+};
+interface GameState {
     currentGravity: number;
-    softDrop: boolean;
     lastARR: number;
     pieceLifeStart: number;
-    dased: boolean;
     L1value: number;
     L2value: number;
     L3value: number;
-    seeN: number;
+
     hdLock: boolean;
-    stage: PIXI.Container;
-    renderer: PIXI.Renderer;
-    settings: {
-        gravity: number;
-        DAS: number;
-        ARR: number;
-        SDF: number;
-        L1: number;
-        L2: number;
-        L3: number;
-        ghostPiece: boolean;
-    },
-    skin: PIXI.Spritesheet;
-    currentInputDirection: number;
+    softDrop: boolean;
+    dased: boolean;
+    held: boolean;
+
     score: number;
     b2b: number;
     combo: number;
-    held: boolean;
-    
+
+    dead: boolean
+}
+interface Handling {
+    DAS: number;
+    ARR: number;
+    SDF: number;
+}
+interface Settings {
+    gravity: number;
+    handling: Handling;
+    L1: number;
+    L2: number;
+    L3: number;
+    seeN: number;
+    ghostPiece: boolean;
+    skin: PIXI.Spritesheet;
+}
+interface Game {
+    field: FieldWrapper;
+    fieldGrid: MinoGrid;
+    input: Input;
+    queue: tet.Queue;
+
+    queueDisplays: PieceDisplay[];
+    holdDisplay: PieceDisplay;
+    queueStage: PIXI.Container;
+    queueRenderer: PIXI.Renderer;
+    holdRenderer: PIXI.Renderer;
+    renderer: PIXI.Renderer;
+
+    state: GameState;
+    settings: Settings;
+
+
+
 }
 let SCORE_MAP = {
     "SINGLE": 200,
@@ -448,135 +500,152 @@ function onInput(
     
     if (key in map) {
         if (e.type === 'keydown') {
-            game.inputs[key].pressed = true;
-            game.inputs[key].justPressed = true;
-            game.inputs[key].pressStart = Date.now();
+            game.input[key].pressed = true;
+            game.input[key].justPressed = true;
+            game.input[key].pressStart = Date.now();
         } else if (e.type === 'keyup') {
-            game.inputs[key].justPressed = false;
-            game.inputs[key].pressed = false;
+            game.input[key].justPressed = false;
+            game.input[key].pressed = false;
         }
     }
 }
 let old = Date.now();
 let deltaTime = 0; 
+function death(game: Game) {
+    console.log("death");
+    for (let i = 0; i < 19; i++) {
+        for (let j = 0; j < 10; j++) {
+            game.field.setTile(j, i, game.field.getTile(j, i) > 0 ? 8 : 0);
+        }
+    }
+}
 function update(game: Game) {
+    if (game.input.reset.pressed) {
+        if (game.input.reset.justPressed) {
+            game.input.reset.justPressed = false;
+            reset(game);
+        }
+    }
+    if (game.state.dead) {
+        return;
+    }
+    // console.log(game.state.dead);
     let spin = false;
     let now = Date.now();
     deltaTime = now - old;
     old = now;
     let original = game.field.getActivePiece()?.clone();
-    game.L3value += deltaTime;
+    game.state.L3value += deltaTime;
     if (game.field.field.canPlaceActivePiece()) {
-        game.L1value += deltaTime;
-        game.L2value += deltaTime;
+        game.state.L1value += deltaTime;
+        game.state.L2value += deltaTime;
     }
     
 
-    if (game.inputs.left.pressed) { 
-        if (game.inputs.left.justPressed) {
-            game.dased = false;
-            game.currentInputDirection = 1;
-            game.inputs.left.justPressed = false;
+    if (game.input.left.pressed) { 
+        if (game.input.left.justPressed) {
+            game.state.dased = false;
+            game.input.currentInputDirection = 1;
+            game.input.left.justPressed = false;
             game.field.moveLeft(1)
             spin = false;
         }
-        console.log(game.dased && game.currentInputDirection != 2);
-        if (now - game.inputs.left.pressStart > game.settings.DAS && !game.dased && game.currentInputDirection != 2) {
+        if (now - game.input.left.pressStart > game.settings.handling.DAS && !game.state.dased && game.input.currentInputDirection != 2) {
             game.field.moveLeft(1)
-            if (game.settings.ARR < 1) {  
+            if (game.settings.handling.ARR < 1) {  
                 game.field.dasPiece(tet.Direction.West, 100000);
             }
-            game.dased = true;
-        } else if (game.dased && game.currentInputDirection != 2) {
-            if (game.settings.ARR < 1) { 
+            game.state.dased = true;
+        } else if (game.state.dased && game.input.currentInputDirection != 2) {
+            if (game.settings.handling.ARR < 1) { 
                 
                 game.field.dasPiece(tet.Direction.West, 100000);
-            } else if (now - game.lastARR >= game.settings.ARR) {
-                game.lastARR = now;
+            } else if (now - game.state.lastARR >= game.settings.handling.ARR) {
+                game.state.lastARR = now;
                 game.field.moveLeft(1);
             }
         }
         
     }
-    if (game.inputs.right.pressed) { 
-        if (game.inputs.right.justPressed) {
-            game.dased = false;
-            game.currentInputDirection = 2;
-            game.inputs.right.justPressed = false;
+    if (game.input.right.pressed) { 
+        if (game.input.right.justPressed) {
+            game.state.dased = false;
+            game.input.currentInputDirection = 2;
+            game.input.right.justPressed = false;
             game.field.moveRight(1);
             spin = false;
         }
-        if (now - game.inputs.right.pressStart > game.settings.DAS && !game.dased && game.currentInputDirection != 1) {
+        if (now - game.input.right.pressStart > game.settings.handling.DAS && !game.state.dased && game.input.currentInputDirection != 1) {
             game.field.moveRight(1)
-            if (game.settings.ARR < 1) {  
+            if (game.settings.handling.ARR < 1) {  
                 game.field.dasPiece(tet.Direction.East, 100000);
             }
-            game.dased = true;
-        } else if (game.dased && game.currentInputDirection != 1) {
-            if (game.settings.ARR < 1) { 
+            game.state.dased = true;
+        } else if (game.state.dased && game.input.currentInputDirection != 1) {
+            if (game.settings.handling.ARR < 1) { 
                 
                 game.field.dasPiece(tet.Direction.East, 100000);
-            } else if (now - game.lastARR >= game.settings.ARR) {
-                game.lastARR = now;
+            } else if (now - game.state.lastARR >= game.settings.handling.ARR) {
+                game.state.lastARR = now;
                 game.field.moveRight(1);
             }
         }
         
     }
-    if (!game.inputs.left.pressed && !game.inputs.right.pressed) {
-        game.dased = false;
-        game.currentInputDirection = 0;
+    if (!game.input.left.pressed && !game.input.right.pressed) {
+        game.state.dased = false;
+        game.input.currentInputDirection = 0;
     } else {
-        game.L1value = 0;
+        game.state.L1value = 0;
     }
-    if (game.inputs.cw.pressed) {
-        if (game.inputs.cw.justPressed) {
-            game.inputs.cw.justPressed = false;
+    if (game.input.cw.pressed) {
+        if (game.input.cw.justPressed) {
+            game.input.cw.justPressed = false;
             game.field.rotatePiece(1);
-            game.L1value = 0;
+            game.state.L1value = 0;
             spin = true;
         }
     }
-    if (game.inputs.ccw.pressed) {
-        if (game.inputs.ccw.justPressed) {
-            game.inputs.ccw.justPressed = false;
+    if (game.input.ccw.pressed) {
+        if (game.input.ccw.justPressed) {
+            game.input.ccw.justPressed = false;
             game.field.rotatePiece(3);
-            game.L1value = 0;
+            game.state.L1value = 0;
             spin = true;
         }
     }
-    if (game.inputs.flip.pressed) {
-        if (game.inputs.flip.justPressed) {
-            game.inputs.flip.justPressed = false;
+    if (game.input.flip.pressed) {
+        if (game.input.flip.justPressed) {
+            game.input.flip.justPressed = false;
             game.field.rotatePiece(2);
-            game.L1value = 0;
+            game.state.L1value = 0;
             spin = true;
         }
     }
-    if (game.inputs.softDrop.pressed) {
-        if (game.inputs.softDrop.justPressed) {
-            game.inputs.softDrop.justPressed = false;
+    if (game.input.softDrop.pressed) {
+        if (game.input.softDrop.justPressed) {
+            game.input.softDrop.justPressed = false;
         }
-        game.softDrop = true;
+        game.state.softDrop = true;
     } else {
-        game.softDrop = false;
+        game.state.softDrop = false;
     }
 
-    game.currentGravity += game.settings.gravity * (game.softDrop ? game.settings.SDF : 1);
+    game.state.currentGravity += game.settings.gravity * (game.state.softDrop ? game.settings.handling.SDF : 1);
     
-    if (game.currentGravity > 1) { 
-        game.field.dasPiece(tet.Direction.South, Math.floor(game.currentGravity));
-        game.currentGravity = 0;
+    if (game.state.currentGravity > 1) { 
+        game.field.dasPiece(tet.Direction.South, Math.floor(game.state.currentGravity));
+        game.state.currentGravity = 0;
         if (original && game.field.getActivePiece()) {
-            game.score += game.softDrop ? 
+            game.state.score += game.state.softDrop ? 
             (original.position[1] - game.field.getActivePiece()!.position[1]) * SCORE_MAP.SOFTDROP : 0;
         }
         
     }
     let create_new_piece = false;
-    if (game.inputs.hold.pressed && game.inputs.hold.justPressed && !game.held) {
-        game.inputs.hold.justPressed = false;
-        game.held = true;
+    if (game.input.hold.pressed && game.input.hold.justPressed && !game.state.held) {
+        game.input.hold.justPressed = false;
+        game.state.held = true;
         let hold = game.field.getHold();
         let active = game.field.getActivePiece();
         let color = active?.color;
@@ -594,26 +663,30 @@ function update(game: Game) {
         
     } else {
         
-        if (game.inputs.hardDrop.pressed && true) {
-            if (game.inputs.hardDrop.justPressed) {
-                game.inputs.hardDrop.justPressed = false;
+        if (game.input.hardDrop.pressed && true) {
+            if (game.input.hardDrop.justPressed) {
+                game.input.hardDrop.justPressed = false;
                 game.field.dasPiece(tet.Direction.South, 9999999999999);
                 if (original && game.field.getActivePiece()) {
-                    game.score += 
+                    game.state.score += 
                     (original.position[1] - game.field.getActivePiece()!.position[1]) 
                     * SCORE_MAP.HARDDROP;
                 }
-                game.hdLock = true;
+                game.state.hdLock = true;
 
             }
 
         }
 
-        if (game.L1value > game.settings.L1 || game.L2value > game.settings.L2 || game.L3value > game.settings.L3 || game.hdLock) {
-            // console.log("L1:", game.L1value, "L2:", game.L2value, "L3:", game.L3value);
+        if (game.state.L1value > game.settings.L1 || game.state.L2value > game.settings.L2 || game.state.L3value > game.settings.L3 || game.state.hdLock) {
+            // console.log("L1:", game.state.L1value, "L2:", game.state.L2value, "L3:", game.state.L3value);
             if (game.field.field.canPlaceActivePiece()) {
                 game.field.placeActivePiece();
-                game.held = false;
+                for (let mino of game.field.getActivePiece()!.getMinos()) {
+                    let x = mino[0];
+                    let y = mino[1];
+                }
+                game.state.held = false;
                 // console.log(game.field.field.board.getTileMatrix().reverse());
                 let rows = game.field.field.board.get_filled_rows();
 
@@ -624,10 +697,10 @@ function update(game: Game) {
 
                         switch (rows.length) {
                             case 0:
-                                game.score += SCORE_MAP.TSM0
+                                game.state.score += SCORE_MAP.TSM0
                             case 1:
-                                game.b2b += 1;
-                                game.score += SCORE_MAP.TSMS * (game.b2b > 0 ? 1.5 : 1);
+                                game.state.b2b += 1;
+                                game.state.score += SCORE_MAP.TSMS * (game.state.b2b > 0 ? 1.5 : 1);
                                 break;
                             default:
                                 break;
@@ -638,84 +711,84 @@ function update(game: Game) {
 
                         switch (rows.length) {
                             case 0:
-                                game.score += SCORE_MAP.TS0;
+                                game.state.score += SCORE_MAP.TS0;
                                 break;
                             case 1:
-                                game.score += SCORE_MAP.TSS * (game.b2b > 0 ? 1.5 : 1);
+                                game.state.score += SCORE_MAP.TSS * (game.state.b2b > 0 ? 1.5 : 1);
                                 break;
                             case 2:
-                                game.score += SCORE_MAP.TSD * (game.b2b > 0 ? 1.5 : 1);
+                                game.state.score += SCORE_MAP.TSD * (game.state.b2b > 0 ? 1.5 : 1);
                                 break;
                             case 3:
-                                game.score += SCORE_MAP.TST * (game.b2b > 0 ? 1.5 : 1);
+                                game.state.score += SCORE_MAP.TST * (game.state.b2b > 0 ? 1.5 : 1);
                                 break;
                             default:
                                 break;
                             
                         }
                         if (rows.length > 0) {
-                            game.b2b += 1;
+                            game.state.b2b += 1;
                         }
                     } else {
 
                         switch (rows.length) {
                             case 1:
-                                game.score += SCORE_MAP.SINGLE;
+                                game.state.score += SCORE_MAP.SINGLE;
                                 break;
                             case 2:
-                                game.score += SCORE_MAP.DOUBLE;
+                                game.state.score += SCORE_MAP.DOUBLE;
                                 break;
                             case 3:
-                                game.score += SCORE_MAP.TRIPLE;
+                                game.state.score += SCORE_MAP.TRIPLE;
                                 break;
                             case 4:
-                                game.score += SCORE_MAP.QUAD * (game.b2b > 0 ? 1.5 : 1);
+                                game.state.score += SCORE_MAP.QUAD * (game.state.b2b > 0 ? 1.5 : 1);
                                 break;
                             default:
                                 break;
                         }
                         if (rows.length > 3) {
-                            game.b2b += 1;
+                            game.state.b2b += 1;
                         } else {
-                            game.b2b = 0
+                            game.state.b2b = 0
                         }
                     }
                 } else {
 
                     switch (rows.length) {
                         case 1:
-                            game.score += SCORE_MAP.SINGLE;
+                            game.state.score += SCORE_MAP.SINGLE;
                             break;
                         case 2:
-                            game.score += SCORE_MAP.DOUBLE;
+                            game.state.score += SCORE_MAP.DOUBLE;
                             break;
                         case 3:
-                            game.score += SCORE_MAP.TRIPLE;
+                            game.state.score += SCORE_MAP.TRIPLE;
                             break;
                         case 4:
-                            game.score += SCORE_MAP.QUAD * (game.b2b > 0 ? 1.5 : 0);
+                            game.state.score += SCORE_MAP.QUAD * (game.state.b2b > 0 ? 1.5 : 0);
                             break;
                         default:
                             break;
                         
                     }
                     if (rows.length > 3) {
-                        game.b2b += 1;
+                        game.state.b2b += 1;
                     } else {
-                        game.b2b = 0
+                        game.state.b2b = 0
                     }
                 }
                 if (rows.length > 0) {
-                    game.score += game.combo * 50;
-                    game.combo += 1;
+                    game.state.score += game.state.combo * 50;
+                    game.state.combo += 1;
                 } else {
-                    game.combo = 0;
+                    game.state.combo = 0;
                 }
                 for (let row of rows) {
                     for (let j = 0; j < 10; j++) {
                         game.field.setTile(j, row, 0);
                     }
-                    for (let i = row; i < 20; i++) {
+                    for (let i = row; i < 24; i++) {
                         for (let j = 0; j < 10; j++) {
                             game.field.setTile(j, i, game.field.getTile(j, i+1));
                         }
@@ -723,7 +796,7 @@ function update(game: Game) {
                 }
                 // console.log(game.field.field.board.getTileMatrix().reverse());
                 if (game.field.checkPC()) {
-                    game.score += SCORE_MAP.PC;
+                    game.state.score += SCORE_MAP.PC;
                 }
                 create_new_piece = true;
 
@@ -735,44 +808,46 @@ function update(game: Game) {
         let active = game.field.getActivePiece();
         if (active) {
             let test = active.clone();
-            let texture_color = game.skin.textures[tet.pieceColorToChar(active.color)];
+            let texture_color = game.settings.skin.textures[tet.pieceColorToChar(active.color)];
             game.field.field.board.dasPiece(test, tet.Direction.South, 999);
             for (let mino of test.getMinos()) {
                 let x = mino[0];
                 let y = 19 - mino[1];
-                
+                if (y < 0) continue;
                 game.fieldGrid.sprites[y][x].texture = texture_color;
                 game.fieldGrid.sprites[y][x].alpha = 0.7;
             }
         }
     }
     game.fieldGrid.updateActive(game.field);
-    game.renderer.render(game.stage);
-    game.score = Math.floor(game.score);
-    document.getElementById("score")!.innerText = `Score: ${game.score}`;
+    game.renderer.render(game.fieldGrid.container);
+    game.holdRenderer.render(game.holdDisplay.container);
+    game.queueRenderer.render(game.queueStage);
+    game.state.score = Math.floor(game.state.score);
+    document.getElementById("score")!.innerText = `Score: ${game.state.score}`;
     if (create_new_piece) {
         game.field.setActivePiece(undefined);
         let color = game.queue.takeNextPiece()!;
-        if (game.queue.len() < game.seeN + 3) {
+        if (game.queue.len() < game.settings.seeN + 3) {
             game.queue.append(generate_queue());
         }
-        game.queueDisplay.forEach((v, i) => {
+        game.queueDisplays.forEach((v, i) => {
             v.piece = game.queue.at(i) ? game.queue.at(i)?.piece : undefined
         })
         let new_piece = new tet.TetPiece(color, tet.Direction.North, new tet.Vec2(4,19));
-        game.field.setActivePiece(new_piece);
-        game.hdLock = false;
-        game.L1value = 0;
-        game.L2value = 0;
-        game.L3value = 0;
-    }
-    if (game.inputs.reset.pressed) {
-        if (game.inputs.reset.justPressed) {
-            game.inputs.reset.justPressed = false;
-            console.log("AAA");
-            reset(game);
+        
+        if (game.field.field.board.doesCollide(new_piece.clone())) {
+
+            death(game);
+            return;
         }
+        game.field.setActivePiece(new_piece);
+        game.state.hdLock = false;
+        game.state.L1value = 0;
+        game.state.L2value = 0;
+        game.state.L3value = 0;
     }
+
 }
 let keymap = {
     left: 'ArrowLeft',
@@ -780,11 +855,12 @@ let keymap = {
     softDrop: 'ArrowDown',
     hardDrop: ' ',
     cw: 'ArrowUp',
-    ccw: 'a',
+    ccw: 'z',
     hold: 'c',
-    flip: 'w',
+    flip: 'a',
     reset: 'r'
-}
+};
+(globalThis as any).keymap = keymap;
 let seeN = 5;
 function reset(game: Game) {
     let queue = new tet.Queue(); 
@@ -792,28 +868,80 @@ function reset(game: Game) {
     queue.append(generate_queue());
     game.field = new FieldWrapper();
     game.queue = queue;
-    game.currentGravity = 0;
-    game.softDrop = false;
-    game.lastARR = 0;
-    game.dased = false;
-    game.pieceLifeStart = Date.now();
-    game.L1value = 0;
-    game.L2value = 0;
-    game.L3value = 0;
-    game.hdLock = false;
-    game.seeN = seeN;
-    game.currentInputDirection = 0;
-    game.combo = 0;
-    game.b2b = 0;
-    game.score = 0;
-    game.held = false;
+    game.state.currentGravity = 0;
+    game.state.softDrop = false;
+    game.state.lastARR = 0;
+    game.state.dased = false;
+    game.state.pieceLifeStart = Date.now();
+    game.state.L1value = 0;
+    game.state.L2value = 0;
+    game.state.L3value = 0;
+    game.state.hdLock = false;
+    game.settings.seeN = seeN;
+    game.input.currentInputDirection = 0;
+    game.state.combo = 0;
+    game.state.b2b = 0;
+    game.state.score = 0;
+    game.state.held = false;
+    game.state.dead = false;
     game.field.setActivePiece(
         new tet.TetPiece(game.queue.takeNextPiece() as tet.PieceColor, 0, new tet.Vec2(4, 19))
     );
-    game.queueDisplay.forEach((v, i) => {
+    game.queueDisplays.forEach((v, i) => {
         v.piece = game.queue.at(i) ? game.queue.at(i)?.piece : undefined
     })
     game.holdDisplay.piece = undefined;
+}
+const BaseDimensions = {
+    board: {
+        width: (game: Game) => 10,
+        height: (game: Game) => 20
+    },
+    hold: {
+        width: (game: Game) => 4,
+        height: (game: Game) => 4
+    },
+    queue: {
+        width: (game: Game) => 4,
+        height: (game: Game) => game.settings.seeN * 4
+    },
+    scale: 0.7
+
+}
+function load(game: Game) {
+    let keyMap = window.localStorage.getItem("keymap");
+    if (keyMap) {
+        keymap = JSON.parse(keyMap);
+        
+    } else {
+        window.localStorage.setItem("keymap", JSON.stringify(keymap));
+    }
+    let handling = window.localStorage.getItem("handling");
+    if (handling) {
+        game.settings.handling = JSON.parse(handling);
+    } else {
+        window.localStorage.setItem("handling", JSON.stringify(game.settings.handling));
+    }
+}
+function saveSettings(
+    game: Game,
+    inputElements: Map<
+        keyof typeof keymap,
+        HTMLInputElement
+    >,
+    handlingElements: Map<
+        keyof Game["settings"]["handling"],
+        HTMLInputElement
+    >
+) {
+    for (let [k, v] of inputElements.entries()) {
+        keymap[k] = v.value == "Space" ? " " : v.value;
+    }
+    for (let [k, v] of handlingElements.entries()) {
+        game.settings.handling[k] = Number(v.value);
+    }
+    window.localStorage.setItem("keymap", JSON.stringify(keymap));
+    window.localStorage.setItem("handling", JSON.stringify(game.settings.handling));
 }
 async function run() {
     
@@ -821,22 +949,32 @@ async function run() {
     await init();
     let minoSheet: PIXI.Spritesheet = await PIXI.Assets.load("assets/skin_sheet.json");
     let renderer = new PIXI.WebGLRenderer();
-    let stage = new PIXI.Container();
+    let holdRenderer = new PIXI.WebGLRenderer();
+    let queueRenderer = new PIXI.WebGLRenderer();
     let field = new FieldWrapper();
-    let fieldGrid = new MinoGrid(20, 10, 0.8, minoSheet, 100);
-    let holdDisplay = new PieceDisplay(minoSheet, 0.8)
-    stage.addChild(fieldGrid.container);
-    stage.addChild(holdDisplay.container);
-    await renderer.init({
-        "backgroundColor": "0xbbedf2",
-        "height": 600,
-        "width": 500
-    });
+    let fieldGrid = new MinoGrid(20, 10, BaseDimensions.scale, minoSheet);
+    let holdDisplay = new PieceDisplay(minoSheet, BaseDimensions.scale)
+    let queueStage = new PIXI.Container();
+    let queue = new tet.Queue();
+    let queueDisplays = [];
+    queue.append(generate_queue());
+    queue.append(generate_queue());
+    queue.append(generate_queue());
+    field.setActivePiece(
+        new tet.TetPiece(queue.takeNextPiece() as tet.PieceColor, 0, new tet.Vec2(4, 19))
+    );
+    for (let i = 0; i < seeN; i++) {
+        let display = new PieceDisplay(minoSheet,  BaseDimensions.scale, 0, i * 4 * 24);
+        display.piece = queue.at(i)?.piece;
+        queueStage.addChild(display.container);
+        queueDisplays.push(display);
+    }
+
     
     let game: Game = {
         field: field,
         fieldGrid: fieldGrid,
-        inputs: {
+        input: {
             left: Key(),
             right: Key(),
             softDrop: Key(),
@@ -846,68 +984,167 @@ async function run() {
             ccw: Key(),
             hold: Key(),
             flip: Key(),
-            reset: Key()
+            reset: Key(),
+
+            currentInputDirection: 0,
         },
-        queue: new tet.Queue(),
-        currentGravity: 0,
+        queue: queue,
+        state: {
+            currentGravity: 0,
+
+            lastARR: 0,
+            pieceLifeStart: Date.now(),
+            L1value: 0,
+            L2value: 0,
+            L3value: 0,
+
+            dased: false,
+            hdLock: false,
+            held: false,
+            softDrop: false,
+
+            score: 0,
+            b2b: 0,
+            combo: 0,
+
+            dead: false
+        },
+
         settings: {
             gravity: 0.01,
-            DAS: 96,
-            ARR: 0,
-            SDF: 999999,
+            handling: {
+                DAS: 133,
+                ARR: 10,
+                SDF: 20
+            },
             L1: 500,
             L2: 5000,
             L3: 20000,
-            ghostPiece: true
+            ghostPiece: true,
+            skin: minoSheet,
+            seeN: seeN
         },
-        softDrop: false,
-        lastARR: 0,
-        dased: false,
-        pieceLifeStart: Date.now(),
-        L1value: 0,
-        L2value: 0,
-        L3value: 0,
-        hdLock: false,
-        seeN: seeN,
-        stage: stage,
-        renderer: renderer,
-        queueDisplay: [],
+        queueDisplays: queueDisplays,
         holdDisplay: holdDisplay,
-        skin: minoSheet,
-        currentInputDirection: 0,
-        score: 0,
-        b2b: 0,
-        combo: 0,
-        held: false
+        queueRenderer: queueRenderer,
+        holdRenderer: holdRenderer,
+        renderer: renderer,
+        queueStage: queueStage
     };
-
-    (globalThis as any).__PIXI_STAGE__ = stage;
+    load(game);
+    await renderer.init({
+        "backgroundAlpha": 0,
+        "height": (BaseDimensions.board.height(game) + 2/16) * 32 * BaseDimensions.scale,
+        "width": (BaseDimensions.board.width(game) + 0/16) * 32 * BaseDimensions.scale
+    });
+    await holdRenderer.init({
+        "backgroundAlpha": 0,
+        "height": BaseDimensions.hold.height(game) * 32 * BaseDimensions.scale,
+        "width": BaseDimensions.hold.width(game) * 32 * BaseDimensions.scale
+    });
+    await queueRenderer.init({
+        "backgroundAlpha": 0,
+        "height": BaseDimensions.queue.height(game) * 32 * BaseDimensions.scale,
+        "width": BaseDimensions.queue.width(game) * 32 * BaseDimensions.scale
+    });
     (globalThis as any).__PIXI_RENDERER__ = renderer;
     (globalThis as any).game = game;
     (globalThis as any).tet = tet;
-    document.body.appendChild(renderer.canvas);
+    let holdDiv = document.getElementById("hold")!;
+    let boardDiv = document.getElementById("board")!;
+    let queueDiv = document.getElementById("queue")!;
+    boardDiv.style.height = Math.round((BaseDimensions.board.height(game) + 2/16) * 32 * BaseDimensions.scale) + "px";
+    boardDiv.style.width = Math.round(BaseDimensions.board.width(game) * 32 * BaseDimensions.scale) + "px";
+    queueDiv.style.height = Math.round(BaseDimensions.queue.height(game) * 32 * BaseDimensions.scale) + "px";
+    queueDiv.style.width = Math.round(BaseDimensions.queue.width(game) * 32 * BaseDimensions.scale) + "px";
+    holdDiv.style.height = Math.round(BaseDimensions.hold.height(game) * 32 * BaseDimensions.scale) + "px";
+    holdDiv.style.width = Math.round(BaseDimensions.hold.width(game) * 32 * BaseDimensions.scale) + "px";
+    // boardDiv.style.left = `${Number(boardDiv.style.left)+0.2*512}px`;
+    console.log(boardDiv.offsetLeft);
+    document.getElementById("board")!.appendChild(renderer.canvas);
+    document.getElementById("queue")!.appendChild(queueRenderer.canvas);
+    document.getElementById("hold")!.appendChild(holdRenderer.canvas);
     let score = document.createElement("span");
     score.id = "score";
-    document.body.appendChild(score);
+    document.getElementById("info")!.appendChild(score);
     document.body.addEventListener('keydown', (e) => onInput(e, keymap, game));
     document.body.addEventListener('keyup', (e) => onInput(e, keymap, game));
-    game.queue.append(generate_queue());
-    game.queue.append(generate_queue());
-    game.queue.append(generate_queue());
-    game.field.setActivePiece(
-        new tet.TetPiece(game.queue.takeNextPiece() as tet.PieceColor, 0, new tet.Vec2(4, 19))
-    );
-    for (let i = 0; i < seeN; i++) {
-        let display = new PieceDisplay(minoSheet, 0.8, 400, i * 4 * 32);
-        display.piece = game.queue.at(i)?.piece;
-        stage.addChild(display.container);
-        game.queueDisplay.push(display);
-    }
     
     setInterval(() => {
         update(game)
     }, 16);
 
+    function createKeyInputElement(key: keyof typeof keymap) {
+        
+        let container = document.createElement("div");
+        container.id = `settings-key-${key}`;
+        let label = document.createElement("label");
+        label.id = `settings-${key}-label`;
+        label.innerText = `${key[0].toUpperCase() + key.slice(1)} key: `;
+        let input = document.createElement("input");
+        input.classList.add("settings-input");
+        input.id = `settings-key-input-${key}`;
+        input.value = keymap[key] ? keymap[key] == " " ? "Space" : keymap[key] : "NONE";
+        container.appendChild(label);
+        container.appendChild(input);
+        function onKeyDown(e: KeyboardEvent) {
+            keymap[key] = e.key;
+            input.value = keymap[key] ? keymap[key] == " " ? "Space" : keymap[key] : "NONE";
+            input.blur();
+              e.preventDefault();
+        }
+        input.addEventListener("keydown", onKeyDown);
+        document.getElementById("settings")!.appendChild(container);
+        return input;
+    }
+    function createHandlingInputElement(name: keyof Game["settings"]["handling"]) {
+        let container = document.createElement("div");
+        container.id = `settings-handling-${name}`;
+        let label = document.createElement("label");
+        label.id = `settings-handling-${name}-label`;
+        label.innerText = `${name[0].toUpperCase() + name.slice(1)}: `;
+        let input = document.createElement("input");
+        input.classList.add("settings-input");
+        input.id = `settings-handling-input${name}`;
+        input.value = game.settings.handling[name].toString();
+        input.type = 'number';
+        container.appendChild(label);
+        container.appendChild(input);
+        function onKeyDown(e: KeyboardEvent) {
+            game.settings.handling[name] = Number(input.value);
+        }
+        input.addEventListener("keydown", onKeyDown);
+        document.getElementById("settings")!.appendChild(container);
+        return input;
+    }
 
+
+    let inputElements = new Map<keyof typeof keymap, HTMLInputElement>();
+    Object.keys(keymap).forEach(key => inputElements.set(
+        key as keyof typeof keymap,
+        createKeyInputElement(key as keyof typeof keymap)
+    ));
+    let handlingElements = new Map<
+        keyof Game["settings"]["handling"], 
+        HTMLInputElement
+    >();
+    Object.keys(game.settings.handling).forEach(
+        key => handlingElements.set(
+            key as keyof Game["settings"]["handling"],
+            createHandlingInputElement(
+                key as keyof Game["settings"]["handling"]
+            )
+        )
+    );
+    
+    let saveButton = document.createElement("button");
+    saveButton.id = "save-button";
+    saveButton.innerText = "Save";
+    saveButton.addEventListener("click", () => saveSettings(
+        game, 
+        inputElements, 
+        handlingElements
+    ));
+    document.getElementById("settings")!.appendChild(saveButton);
 }
-run();
+window.onload = run

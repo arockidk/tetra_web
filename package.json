@@ -5,10 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "copy_build": "cd ./rust_tetro && cp -r ./pkg ../dist/scripts/pkg && cd ../src && mkdir scripts && cd ../rust_tetro && ls && cp -r ./pkg ../src/scripts/pkg && cd .. ",
+    "copy_build": "cd ./rust_tetro && cp -r ./pkg ../dist/scripts/pkg && cp -r ./pkg ../src/pkg && cd .. ",
     "dev_build": "cd ./rust_tetro && wasm-pack build --dev --target web && npm run copy_build",
     "wasm_build": "cd ./rust_tetro && wasm-pack build --release --target web && cp -r ./pkg ../dist/scripts/pkg && cd .. ",
-    "clear_tet_lib": "rm -rf rust_tetro/ && rm -rf dist/scripts/pkg && rm -rf src/scripts",
+    "clear_tet_lib": "rm -rf rust_tetro/ && rm -rf dist/scripts/pkg && rm -rf src/pkg",
     "get_tet_lib": "git clone https://github.com/arockidk/rust_tetro.git && npm run dev_build",
     "get_local_lib": "cp -r ../../../dev/chrome-tris/bettersfinder/rust_tetro . && npm run dev_build",
     "update_tet_lib": "npm run clear_tet_lib && npm run get_tet_lib ",
