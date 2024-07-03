@@ -11,6 +11,7 @@
 }
 body {
     margin: 0;
+    background-color: black;
 }
 #topbar { 
     clear: both;
@@ -23,18 +24,45 @@ body {
     font-size: 30px;
 }
 #game {
-    width: 50%;
-    margin: 0 25%;
-    height: 550px;
-    border: 2px solid var(--grey);
+    width: 100%;
+    height: 500px;
+}
+#settings {
+    width: 80%;
+    margin: auto;
+    text-align: center;
+    background-color: var(--color-a-dark);
+}
+#hold {
+    position: relative;
+    bottom: 68%;
 }
 #info {
     color: var(--grey);
     text-align: center;
+    margin-bottom: 10px;
 }
 #main {
-    width: 50%;
-    height: 700px;
+    width: 512px;
+    height: auto;
     background-color: var(--color-a-dark);
-    margin: auto;
+    margin-left: 10%;
+}
+#save-button {
+    margin: 5px;
+    background-color: var(--color-a);
+    font-family: Renogare;
+    color: white;
+    /* border: 2px solid var(--color-a-dark); */
+}
+.settings-input {
+    background-color: var(--color-a-dark);
+    width: 5rem;
+    color: white;
+    font-family: Renogare;
+    font-size: smaller;
+    text-align: center;
+}
+.game {
+    display: inline-block;
 }
