@@ -1,0 +1,68 @@
+@font-face {
+    font-family: Renogare;
+    src: url(assets/Renogare-Regular.otf);
+}
+:root {
+    --color-a: #315d90;
+    --color-a-dark: #284567;
+    --grey: #a3a6b3;
+    font-family: Renogare;
+    color: white;
+}
+body {
+    margin: 0;
+    background-color: black;
+}
+#topbar { 
+    clear: both;
+    background-color: var(--color-a);
+    color: var(--grey);
+    height: 60px;
+    width: 100%;
+    text-align: center;
+    margin: 0 auto;
+    font-size: 30px;
+}
+#game {
+    width: 100%;
+    height: 500px;
+}
+#settings {
+    width: 80%;
+    margin: auto;
+    text-align: center;
+    background-color: var(--color-a-dark);
+}
+#hold {
+    position: relative;
+    bottom: 68%;
+}
+#info {
+    color: var(--grey);
+    text-align: center;
+    margin-bottom: 10px;
+}
+#main {
+    width: 512px;
+    height: auto;
+    background-color: var(--color-a-dark);
+    margin-left: 10%;
+}
+#save-button {
+    margin: 5px;
+    background-color: var(--color-a);
+    font-family: Renogare;
+    color: white;
+    /* border: 2px solid var(--color-a-dark); */
+}
+.settings-input {
+    background-color: var(--color-a-dark);
+    width: 5rem;
+    color: white;
+    font-family: Renogare;
+    font-size: smaller;
+    text-align: center;
+}
+.game {
+    display: inline-block;
+}
