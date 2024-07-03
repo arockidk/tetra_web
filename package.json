@@ -14,7 +14,7 @@
     "update_tet_lib": "npm run clear_tet_lib && npm run get_tet_lib ",
     "update_local_lib": "npm run clear_tet_lib && npm run get_local_lib",
     "build": "npm run update_tet_lib && npm run wasm_build && tsc",
-    "deploy": "gh-pages deploy -d ./dist",
+    "deploy": "git subtree push --prefix dist origin gh-pages",
     "dev": "dev.bat"
   },
   "keywords": [],
