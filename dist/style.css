@@ -3,15 +3,34 @@
     src: url(assets/Renogare-Regular.otf);
 }
 :root {
-    --color-a: #315d90;
-    --color-a-dark: #284567;
-    --grey: #a3a6b3;
+    --color-a: rgb(126, 84, 173);
+    --color-a-mid: #5f3f84;
+    --color-a-dark: #44385f;
+    
+    --grey: #ada3b3;
     font-family: Renogare;
     color: white;
 }
 body {
     margin: 0;
     background-color: black;
+}
+#info-banner {
+    background-color: var(--color-a-dark);
+    width: 100%;
+    height: 90px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+#info-banner-text {
+    display: inline-block;
+    background-color: var(--color-a-mid);
+    width: 490px;
+    height: 70px;
+    margin: 10px 0;
+    padding: auto 0;
+    font-size: x-large;
+    
 }
 #topbar { 
     clear: both;
