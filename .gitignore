@@ -4,6 +4,6 @@ interbuild
 rust_tetro/
 package-lock.json
 transform_spritesheet.py
-dist/scripts/
+
 dist/*.wasm
 .vscode/
