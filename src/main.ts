@@ -376,7 +376,7 @@ class InfoDisplay<T> {
     }
     public update() {
         if (this._game) {
-            console.log(this._game.state[this._label]);
+            
             if (this._game.state[this._label] != undefined) {
                 this._value = this._game.state[this._label];
             }
@@ -424,6 +424,33 @@ function Key(): Key {
         pressStart: 0
     }
 }
+class FumenLoadComponent {
+    public el: HTMLDivElement;
+    game?: Game;
+    public loadFumen(fumString: string) {
+        let tetFu: tet.TetFumen = tet.TetFumen.load(fumString);
+        if (this.game) {
+            this.game!.field = new FieldWrapper(tetFu.getPageAt(0).field);
+        }
+        
+    }
+    public constructor(game?: Game) {
+        this.game = game;
+        let div = document.createElement("div");
+        let button = document.createElement("button");
+        let input = document.createElement("input");
+        button.innerText = "Load"
+        button.onclick = function() {
+
+        }
+        div.appendChild(button);
+        div.appendChild(input);
+        this.el = div;
+    }  
+}
+class MobileInputComponent {
+    
+}
 function randint(min: number, max: number) {
     return Math.floor(Math.random() * (max - min + 1) + min);
 }
@@ -467,14 +494,16 @@ interface GameState {
     L2value: number;
     L3value: number;
     frames: number;
+
     lines: number;
+    score: number;
+    level: number;
 
     hdLock: boolean;
     softDrop: boolean;
     dased: boolean;
     held: boolean;
 
-    score: number;
     b2b: number;
     combo: number;
 
@@ -699,8 +728,8 @@ function update(game: Game) {
             game.state.softDrop = false;
         }
 
-        game.state.currentGravity += game.settings.gravity * (game.state.softDrop ? game.settings.handling.SDF : 1)
-        * Math.max(1,Math.pow(Math.floor(game.state.lines/10)/3.2, 2))
+        game.state.currentGravity += game.settings.gravity * (game.state.softDrop ? game.settings.handling.SDF : 1) 
+        * Math.max(1,Math.pow(2,game.state.level/3.2));
         
         if (game.state.currentGravity > 1) { 
             game.field.dasPiece(tet.Direction.South, Math.floor(game.state.currentGravity));
@@ -749,6 +778,7 @@ function update(game: Game) {
 
             if (game.state.L1value > game.settings.L1 || game.state.L2value > game.settings.L2 || game.state.L3value > game.settings.L3 || game.state.hdLock) {
                 // console.log("L1:", game.state.L1value, "L2:", game.state.L2value, "L3:", game.state.L3value);
+                let scoreToAdd = 0;
                 if (game.field.field.canPlaceActivePiece()) {
                     game.field.placeActivePiece();
                     for (let mino of game.field.getActivePiece()!.getMinos()) {
@@ -766,10 +796,10 @@ function update(game: Game) {
 
                             switch (rows.length) {
                                 case 0:
-                                    game.state.score += SCORE_MAP.TSM0
+                                    scoreToAdd += SCORE_MAP.TSM0
                                 case 1:
                                     game.state.b2b += 1;
-                                    game.state.score += SCORE_MAP.TSMS * (game.state.b2b > 0 ? 1.5 : 1);
+                                    scoreToAdd += SCORE_MAP.TSMS * (game.state.b2b > 0 ? 1.5 : 1);
                                     break;
                                 default:
                                     break;
@@ -780,16 +810,16 @@ function update(game: Game) {
 
                             switch (rows.length) {
                                 case 0:
-                                    game.state.score += SCORE_MAP.TS0;
+                                    scoreToAdd += SCORE_MAP.TS0;
                                     break;
                                 case 1:
-                                    game.state.score += SCORE_MAP.TSS * (game.state.b2b > 0 ? 1.5 : 1);
+                                    scoreToAdd += SCORE_MAP.TSS * (game.state.b2b > 0 ? 1.5 : 1);
                                     break;
                                 case 2:
-                                    game.state.score += SCORE_MAP.TSD * (game.state.b2b > 0 ? 1.5 : 1);
+                                    scoreToAdd += SCORE_MAP.TSD * (game.state.b2b > 0 ? 1.5 : 1);
                                     break;
                                 case 3:
-                                    game.state.score += SCORE_MAP.TST * (game.state.b2b > 0 ? 1.5 : 1);
+                                    scoreToAdd += SCORE_MAP.TST * (game.state.b2b > 0 ? 1.5 : 1);
                                     break;
                                 default:
                                     break;
@@ -802,16 +832,16 @@ function update(game: Game) {
 
                             switch (rows.length) {
                                 case 1:
-                                    game.state.score += SCORE_MAP.SINGLE;
+                                    scoreToAdd += SCORE_MAP.SINGLE;
                                     break;
                                 case 2:
-                                    game.state.score += SCORE_MAP.DOUBLE;
+                                    scoreToAdd += SCORE_MAP.DOUBLE;
                                     break;
                                 case 3:
-                                    game.state.score += SCORE_MAP.TRIPLE;
+                                    scoreToAdd += SCORE_MAP.TRIPLE;
                                     break;
                                 case 4:
-                                    game.state.score += SCORE_MAP.QUAD * (game.state.b2b > 0 ? 1.5 : 1);
+                                    scoreToAdd += SCORE_MAP.QUAD * (game.state.b2b > 0 ? 1.5 : 1);
                                     break;
                                 default:
                                     break;
@@ -826,16 +856,16 @@ function update(game: Game) {
 
                         switch (rows.length) {
                             case 1:
-                                game.state.score += SCORE_MAP.SINGLE;
+                                scoreToAdd += SCORE_MAP.SINGLE;
                                 break;
                             case 2:
-                                game.state.score += SCORE_MAP.DOUBLE;
+                                scoreToAdd += SCORE_MAP.DOUBLE;
                                 break;
                             case 3:
-                                game.state.score += SCORE_MAP.TRIPLE;
+                                scoreToAdd += SCORE_MAP.TRIPLE;
                                 break;
                             case 4:
-                                game.state.score += SCORE_MAP.QUAD * (game.state.b2b > 0 ? 1.5 : 0);
+                                scoreToAdd += SCORE_MAP.QUAD * (game.state.b2b > 0 ? 1.5 : 0);
                                 break;
                             default:
                                 break;
@@ -848,7 +878,8 @@ function update(game: Game) {
                         }
                     }
                     if (rows.length > 0) {
-                        game.state.score += game.state.combo * 50;
+                        scoreToAdd += game.state.combo * 50;
+                        
                         game.state.combo += 1;
                     } else {
                         game.state.combo = 0;
@@ -865,8 +896,11 @@ function update(game: Game) {
                     }
                     // console.log(game.field.field.board.getTileMatrix().reverse());
                     if (game.field.checkPC()) {
-                        game.state.score += SCORE_MAP.PC;
+                        scoreToAdd += SCORE_MAP.PC;
                     }
+                    console.log(scoreToAdd, game.state.level);
+                    game.state.score += scoreToAdd * game.state.level;
+                    game.state.level = Math.floor(game.state.lines / 10) + 1;
                     create_new_piece = true;
 
                 }
@@ -969,6 +1003,13 @@ function countdown(game: Game) {
     }, 1000);
 
 }
+function createInfoDisplay<T>(label: string, game: Game): InfoDisplay<T> {
+    let infoDisplay = new InfoDisplay<T>(label, game);
+    game.infoDisplays.push(infoDisplay);
+    document.getElementById("info")!.appendChild(infoDisplay.element);
+
+    return infoDisplay;
+}
 function reset(game: Game) {
     let queue = new tet.Queue(); 
     queue.append(generate_queue());
@@ -981,7 +1022,7 @@ function reset(game: Game) {
     game.state.dased = false;
     game.state.pieceLifeStart = Date.now();
     game.state.frames = 0;
-    game.state.lines = 0;
+    game.state.lines = 550;
     game.state.L1value = 0;
     game.state.L2value = 0;
     game.state.L3value = 0;
@@ -991,6 +1032,7 @@ function reset(game: Game) {
     game.state.combo = 0;
     game.state.b2b = 0;
     game.state.score = 0;
+    game.state.level = 1;
     game.state.held = false;
     game.state.dead = true;
 
@@ -1051,7 +1093,7 @@ function saveSettings(
     window.localStorage.setItem("keymap", JSON.stringify(keymap));
     window.localStorage.setItem("handling", JSON.stringify(game.settings.handling));
 }
-async function run() {
+async function run_game() {
     
 
     await init();
@@ -1116,11 +1158,12 @@ async function run() {
             b2b: 0,
             combo: 0,
 
-            dead: false
+            dead: false,
+            level: 1
         },
 
         settings: {
-            gravity: 0.02,
+            gravity: 0.01,
             handling: {
                 DAS: 133,
                 ARR: 10,
@@ -1174,9 +1217,8 @@ async function run() {
     document.getElementById("board")!.appendChild(renderer.canvas);
     document.getElementById("queue")!.appendChild(queueRenderer.canvas);
     document.getElementById("hold")!.appendChild(holdRenderer.canvas);
-    let scoreDisplay = new InfoDisplay<number>("score", game);
-    document.getElementById("info")!.appendChild(scoreDisplay.element);
-    game.infoDisplays.push(scoreDisplay);
+    let scoreDisplay = createInfoDisplay<number>("score", game);
+    let linesDisplay = createInfoDisplay<number>("lines", game);
     document.body.addEventListener('keydown', (e) => onInput(e, keymap, game));
     document.body.addEventListener('keyup', (e) => onInput(e, keymap, game));
     
@@ -1257,4 +1299,4 @@ async function run() {
     ));
     document.getElementById("settings")!.appendChild(saveButton);
 }
-window.onload = run
+window.onload = run_game;

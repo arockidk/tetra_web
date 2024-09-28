@@ -82,6 +82,9 @@ body {
     font-size: smaller;
     text-align: center;
 }
+.info-display {
+    display: block;
+}
 .game {
     display: inline-block;
 }
