@@ -32,14 +32,9 @@ export function direction_to_i32(dir: Direction): number;
 export function direction_to_i64(dir: Direction): bigint;
 /**
 */
-export enum PieceType {
-  I = 1,
-  L = 2,
-  O = 3,
-  Z = 4,
-  T = 5,
-  J = 6,
-  S = 7,
+export enum QueueNodeType {
+  Choose = 0,
+  Piece = 1,
 }
 /**
 */
@@ -56,10 +51,27 @@ export enum CellColor {
 }
 /**
 */
-export enum TSpinResult {
-  NoSpin = 0,
-  MiniSpin = 1,
-  TSpin = 2,
+export enum PieceColor {
+  B = 0,
+  I = 1,
+  L = 2,
+  O = 3,
+  Z = 4,
+  T = 5,
+  J = 6,
+  S = 7,
+  G = 8,
+}
+/**
+*/
+export enum PieceType {
+  I = 1,
+  L = 2,
+  O = 3,
+  Z = 4,
+  T = 5,
+  J = 6,
+  S = 7,
 }
 /**
 */
@@ -71,29 +83,18 @@ export enum Direction {
 }
 /**
 */
-export enum PieceColor {
-  B = 0,
-  I = 1,
-  L = 2,
-  O = 3,
-  Z = 4,
-  T = 5,
-  J = 6,
-  S = 7,
-}
-/**
-*/
-export enum QueueNodeType {
-  Choose = 0,
-  Piece = 1,
-}
-/**
-*/
 export enum RotationState {
   South = 0,
   East = 1,
   North = 2,
   West = 3,
+}
+/**
+*/
+export enum TSpinResult {
+  NoSpin = 0,
+  MiniSpin = 1,
+  TSpin = 2,
 }
 /**
 *
@@ -181,6 +182,38 @@ export class Action {
 }
 /**
 */
+export class Choose {
+  free(): void;
+/**
+* @param {any[]} pieces
+* @param {number} count
+*/
+  constructor(pieces: any[], count: number);
+/**
+* @returns {number}
+*/
+  size(): number;
+/**
+* @returns {(Queue)[]}
+*/
+  getQueues(): (Queue)[];
+/**
+* @param {string} s
+* @returns {Choose | undefined}
+*/
+  static from_string(s: string): Choose | undefined;
+/**
+*
+*     * Reorders the choose's pieces into TILJOSZ order. 
+*     
+*/
+  sort(): void;
+/**
+*/
+  count: number;
+}
+/**
+*/
 export class ClearStruct {
   free(): void;
 /**
@@ -206,6 +239,11 @@ export class Field {
 * @param {TetPiece | undefined} [hold]
 */
   constructor(board: TetBoard, active_piece?: TetPiece, hold?: TetPiece);
+/**
+* @param {TetBoard} board
+* @returns {Field}
+*/
+  static fromBoard(board: TetBoard): Field;
 /**
 * @returns {boolean}
 */
@@ -565,6 +603,10 @@ export class TetBoard {
 */
   placeNClear(piece: TetPiece): ClearStruct;
 /**
+* @returns {string}
+*/
+  noColorString(): string;
+/**
 */
   height: number;
 /**
@@ -578,6 +620,20 @@ export class TetFumen {
 /**
 */
   constructor();
+/**
+* @param {string} code
+* @returns {TetFumen}
+*/
+  static load(code: string): TetFumen;
+/**
+* @param {string} code
+* @returns {TetFumen}
+*/
+  static loadSlice(code: string): TetFumen;
+/**
+* @returns {number}
+*/
+  len(): number;
 /**
 * @returns {number}
 */
@@ -595,9 +651,9 @@ export class TetFumen {
   decodeFumen(fumen: string): void;
 /**
 * @param {number} idx
-* @returns {number}
+* @returns {TetPage}
 */
-  getPageAt(idx: number): number;
+  getPageAt(idx: number): TetPage;
 /**
 */
   guideline: boolean;
@@ -607,23 +663,22 @@ export class TetFumen {
 export class TetPage {
   free(): void;
 /**
-* @param {Field} field
 */
-  set_field(field: Field): void;
+  createBlankPiece(): void;
 /**
 * @param {Page} pg
 * @returns {TetPage}
 */
-  static from_fumen_page(pg: Page): TetPage;
+  static fromFumenPage(pg: Page): TetPage;
 /**
 */
   comment?: string | undefined;
 /**
 */
-  readonly field: number;
+  field: Field;
 /**
 */
-  readonly fumen_page: number;
+  readonly fumen_page: Page;
 /**
 */
   lock: boolean;
@@ -706,6 +761,11 @@ export class TetPiece {
 */
   getMinos(): Array<any>;
 /**
+* @param {number} y
+* @returns {boolean}
+*/
+  minoAbove(y: number): boolean;
+/**
 */
   color: PieceColor;
 /**
@@ -731,70 +791,22 @@ export class Vec2 {
 */
   1: number;
 }
-/**
-*
-* * lowest 40 bits represent 10x4 board state
-* * example:
-* * 0b0000001111_0000000111_0000011111_0000001111
-* * on multiple lines this will look like
-* * 0b0000001111
-* *   0000000111
-* *   0000011111
-* *   0000000111
-* *
-* 
-*/
-export class u64_board {
-  free(): void;
-}
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
-  readonly pieceColorFromInt: (a: number) => number;
-  readonly pieceColorFromStr: (a: number, b: number) => number;
-  readonly pieceColorToChar: (a: number) => number;
-  readonly direction_to_i8: (a: number) => number;
-  readonly direction_to_i32: (a: number) => number;
-  readonly direction_to_i64: (a: number) => number;
-  readonly __wbg_tetpiece_free: (a: number) => void;
-  readonly __wbg_get_tetpiece_rotation: (a: number) => number;
-  readonly __wbg_set_tetpiece_rotation: (a: number, b: number) => void;
-  readonly __wbg_get_tetpiece_position: (a: number) => number;
-  readonly __wbg_set_tetpiece_position: (a: number, b: number) => void;
-  readonly tetpiece_new: (a: number, b: number, c: number) => number;
-  readonly tetpiece_z: () => number;
-  readonly tetpiece_i: () => number;
-  readonly tetpiece_j: () => number;
-  readonly tetpiece_l: () => number;
-  readonly tetpiece_o: () => number;
-  readonly tetpiece_t: () => number;
-  readonly tetpiece_s: () => number;
-  readonly tetpiece_applyGravity: (a: number, b: number) => void;
-  readonly tetpiece_clone: (a: number) => number;
-  readonly tetpiece_moveLeft: (a: number, b: number) => void;
-  readonly tetpiece_moveRight: (a: number, b: number) => void;
-  readonly tetpiece_getRawMinos: (a: number) => number;
-  readonly tetpiece_getMinos: (a: number) => number;
-  readonly tetpiece_color: (a: number) => number;
-  readonly tetpiece_set_color: (a: number, b: number) => void;
-  readonly __wbg_vec2_free: (a: number) => void;
-  readonly __wbg_get_vec2_0: (a: number) => number;
-  readonly __wbg_set_vec2_0: (a: number, b: number) => void;
-  readonly __wbg_get_vec2_1: (a: number) => number;
-  readonly __wbg_set_vec2_1: (a: number, b: number) => void;
-  readonly vec2_new: (a: number, b: number) => number;
-  readonly __wbg_tetpage_free: (a: number) => void;
+  readonly __wbg_tetpage_free: (a: number, b: number) => void;
   readonly __wbg_get_tetpage_rise: (a: number) => number;
   readonly __wbg_set_tetpage_rise: (a: number, b: number) => void;
   readonly __wbg_get_tetpage_lock: (a: number) => number;
   readonly __wbg_set_tetpage_lock: (a: number, b: number) => void;
   readonly __wbg_get_tetpage_mirror: (a: number) => number;
   readonly __wbg_set_tetpage_mirror: (a: number, b: number) => void;
-  readonly __wbg_tetfumen_free: (a: number) => void;
+  readonly __wbg_tetfumen_free: (a: number, b: number) => void;
   readonly __wbg_get_tetfumen_guideline: (a: number) => number;
   readonly __wbg_set_tetfumen_guideline: (a: number, b: number) => void;
+  readonly tetpage_createBlankPiece: (a: number) => void;
   readonly tetpage_set_piece_color: (a: number, b: number) => void;
   readonly tetpage_set_piece_rotation: (a: number, b: number) => void;
   readonly tetpage_set_piece_position: (a: number, b: number) => void;
@@ -803,78 +815,21 @@ export interface InitOutput {
   readonly tetpage_field: (a: number) => number;
   readonly tetpage_fumen_page: (a: number) => number;
   readonly tetpage_comment: (a: number, b: number) => void;
-  readonly tetpage_from_fumen_page: (a: number) => number;
+  readonly tetpage_fromFumenPage: (a: number) => number;
   readonly tetfumen_new: () => number;
+  readonly tetfumen_load: (a: number, b: number) => number;
+  readonly tetfumen_loadSlice: (a: number, b: number) => number;
+  readonly tetfumen_len: (a: number) => number;
   readonly tetfumen_addPage: (a: number) => number;
   readonly tetfumen_update: (a: number) => void;
   readonly tetfumen_encodeFumen: (a: number, b: number) => void;
   readonly tetfumen_decodeFumen: (a: number, b: number, c: number) => void;
   readonly tetfumen_getPageAt: (a: number, b: number) => number;
-  readonly __wbg_action_free: (a: number) => void;
-  readonly __wbg_get_action_0: (a: number) => number;
-  readonly __wbg_set_action_0: (a: number, b: number) => void;
-  readonly action_get_left: (a: number) => number;
-  readonly action_get_right: (a: number) => number;
-  readonly action_get_soft_drop: (a: number) => number;
-  readonly action_get_hard_drop: (a: number) => number;
-  readonly action_get_counter_clockwise: (a: number) => number;
-  readonly action_get_clockwise: (a: number) => number;
-  readonly action_get_hold: (a: number) => number;
-  readonly action_get_180_rotation: (a: number) => number;
-  readonly action_set_left: (a: number, b: number) => void;
-  readonly action_set_right: (a: number, b: number) => void;
-  readonly action_set_soft_drop: (a: number, b: number) => void;
-  readonly action_set_hard_drop: (a: number, b: number) => void;
-  readonly action_set_counter_clockwise: (a: number, b: number) => void;
-  readonly action_set_clockwise: (a: number, b: number) => void;
-  readonly action_set_hold: (a: number, b: number) => void;
-  readonly action_set_180_rotation: (a: number, b: number) => void;
-  readonly __wbg_queuenode_free: (a: number) => void;
-  readonly __wbg_get_queuenode_node_type: (a: number) => number;
-  readonly __wbg_set_queuenode_node_type: (a: number, b: number) => void;
-  readonly queuenode_js_new: (a: number, b: number, c: number, d: number) => number;
-  readonly queuenode_js_choose: (a: number) => number;
-  readonly queuenode_piece: (a: number) => number;
-  readonly __wbg_queue_free: (a: number) => void;
-  readonly queue_new: () => number;
-  readonly queue_at: (a: number, b: number) => number;
-  readonly queue_mut_at: (a: number, b: number) => number;
-  readonly queue_append: (a: number, b: number) => void;
-  readonly queue_pushBack: (a: number, b: number) => void;
-  readonly queue_popBack: (a: number, b: number) => void;
-  readonly queue_pushFront: (a: number, b: number) => void;
-  readonly queue_popFront: (a: number, b: number) => void;
-  readonly queue_head: (a: number) => number;
-  readonly queue_fromString: (a: number, b: number) => number;
-  readonly queue_insertPiece: (a: number, b: number) => void;
-  readonly queue_takeNextPiece: (a: number) => number;
-  readonly queue_len: (a: number) => number;
-  readonly __wbg_u64_board_free: (a: number) => void;
-  readonly __wbg_field_free: (a: number) => void;
-  readonly __wbg_get_field_board: (a: number) => number;
-  readonly __wbg_set_field_board: (a: number, b: number) => void;
-  readonly __wbg_get_field_active_piece: (a: number) => number;
-  readonly __wbg_set_field_active_piece: (a: number, b: number) => void;
-  readonly __wbg_get_field_hold: (a: number) => number;
-  readonly __wbg_set_field_hold: (a: number, b: number) => void;
-  readonly field_new: (a: number, b: number, c: number) => number;
-  readonly field_canPlaceActivePiece: (a: number) => number;
-  readonly field_applyGravity: (a: number, b: number) => number;
-  readonly field_moveLeft: (a: number, b: number) => number;
-  readonly field_moveRight: (a: number, b: number) => number;
-  readonly field_dasPiece: (a: number, b: number, c: number) => number;
-  readonly field_rotatePiece: (a: number, b: number) => void;
-  readonly field_getTile: (a: number, b: number, c: number) => number;
-  readonly field_setTile: (a: number, b: number, c: number, d: number) => void;
-  readonly field_place_active_piece: (a: number) => number;
-  readonly field_place_n_clear_active_piece: (a: number) => number;
-  readonly field_checkPC: (a: number) => number;
-  readonly field_checkTSpin: (a: number) => number;
-  readonly __wbg_clearstruct_free: (a: number) => void;
+  readonly __wbg_clearstruct_free: (a: number, b: number) => void;
   readonly __wbg_get_clearstruct_0: (a: number) => number;
   readonly __wbg_set_clearstruct_0: (a: number, b: number) => void;
   readonly clearstruct_getLines: (a: number, b: number) => void;
-  readonly __wbg_tetboard_free: (a: number) => void;
+  readonly __wbg_tetboard_free: (a: number, b: number) => void;
   readonly __wbg_get_tetboard_height: (a: number) => number;
   readonly __wbg_set_tetboard_height: (a: number, b: number) => void;
   readonly __wbg_get_tetboard_width: (a: number) => number;
@@ -903,10 +858,113 @@ export interface InitOutput {
   readonly tetboard_checkTSpin: (a: number, b: number) => number;
   readonly tetboard_place: (a: number, b: number) => number;
   readonly tetboard_placeNClear: (a: number, b: number) => number;
-  readonly __wbg_fumen_free: (a: number) => void;
+  readonly tetboard_noColorString: (a: number, b: number) => void;
+  readonly __wbg_field_free: (a: number, b: number) => void;
+  readonly __wbg_get_field_board: (a: number) => number;
+  readonly __wbg_set_field_board: (a: number, b: number) => void;
+  readonly __wbg_get_field_active_piece: (a: number) => number;
+  readonly __wbg_set_field_active_piece: (a: number, b: number) => void;
+  readonly __wbg_get_field_hold: (a: number) => number;
+  readonly __wbg_set_field_hold: (a: number, b: number) => void;
+  readonly field_new: (a: number, b: number, c: number) => number;
+  readonly field_fromBoard: (a: number) => number;
+  readonly field_canPlaceActivePiece: (a: number) => number;
+  readonly field_applyGravity: (a: number, b: number) => number;
+  readonly field_moveLeft: (a: number, b: number) => number;
+  readonly field_moveRight: (a: number, b: number) => number;
+  readonly field_dasPiece: (a: number, b: number, c: number) => number;
+  readonly field_rotatePiece: (a: number, b: number) => void;
+  readonly field_getTile: (a: number, b: number, c: number) => number;
+  readonly field_setTile: (a: number, b: number, c: number, d: number) => void;
+  readonly field_place_active_piece: (a: number) => number;
+  readonly field_place_n_clear_active_piece: (a: number) => number;
+  readonly field_checkPC: (a: number) => number;
+  readonly field_checkTSpin: (a: number) => number;
+  readonly __wbg_vec2_free: (a: number, b: number) => void;
+  readonly __wbg_get_vec2_0: (a: number) => number;
+  readonly __wbg_set_vec2_0: (a: number, b: number) => void;
+  readonly __wbg_get_vec2_1: (a: number) => number;
+  readonly __wbg_set_vec2_1: (a: number, b: number) => void;
+  readonly vec2_new: (a: number, b: number) => number;
+  readonly __wbg_action_free: (a: number, b: number) => void;
+  readonly __wbg_get_action_0: (a: number) => number;
+  readonly __wbg_set_action_0: (a: number, b: number) => void;
+  readonly action_get_left: (a: number) => number;
+  readonly action_get_right: (a: number) => number;
+  readonly action_get_soft_drop: (a: number) => number;
+  readonly action_get_hard_drop: (a: number) => number;
+  readonly action_get_counter_clockwise: (a: number) => number;
+  readonly action_get_clockwise: (a: number) => number;
+  readonly action_get_hold: (a: number) => number;
+  readonly action_get_180_rotation: (a: number) => number;
+  readonly action_set_180_rotation: (a: number, b: number) => void;
+  readonly action_set_right: (a: number, b: number) => void;
+  readonly action_set_soft_drop: (a: number, b: number) => void;
+  readonly action_set_left: (a: number, b: number) => void;
+  readonly action_set_hard_drop: (a: number, b: number) => void;
+  readonly action_set_counter_clockwise: (a: number, b: number) => void;
+  readonly action_set_hold: (a: number, b: number) => void;
+  readonly action_set_clockwise: (a: number, b: number) => void;
+  readonly __wbg_queuenode_free: (a: number, b: number) => void;
+  readonly __wbg_get_queuenode_node_type: (a: number) => number;
+  readonly __wbg_set_queuenode_node_type: (a: number, b: number) => void;
+  readonly queuenode_js_new: (a: number, b: number, c: number, d: number) => number;
+  readonly queuenode_js_choose: (a: number) => number;
+  readonly queuenode_piece: (a: number) => number;
+  readonly __wbg_queue_free: (a: number, b: number) => void;
+  readonly queue_new: () => number;
+  readonly queue_at: (a: number, b: number) => number;
+  readonly queue_mut_at: (a: number, b: number) => number;
+  readonly queue_append: (a: number, b: number) => void;
+  readonly queue_pushBack: (a: number, b: number) => void;
+  readonly queue_popBack: (a: number, b: number) => void;
+  readonly queue_pushFront: (a: number, b: number) => void;
+  readonly queue_popFront: (a: number, b: number) => void;
+  readonly queue_head: (a: number) => number;
+  readonly queue_fromString: (a: number, b: number) => number;
+  readonly queue_insertPiece: (a: number, b: number) => void;
+  readonly queue_takeNextPiece: (a: number) => number;
+  readonly queue_len: (a: number) => number;
+  readonly __wbg_choose_free: (a: number, b: number) => void;
+  readonly __wbg_get_choose_count: (a: number) => number;
+  readonly __wbg_set_choose_count: (a: number, b: number) => void;
+  readonly choose_new: (a: number, b: number, c: number) => number;
+  readonly choose_size: (a: number) => number;
+  readonly choose_getQueues: (a: number, b: number) => void;
+  readonly choose_from_string: (a: number, b: number) => number;
+  readonly choose_sort: (a: number) => void;
+  readonly pieceColorFromInt: (a: number) => number;
+  readonly pieceColorFromStr: (a: number, b: number) => number;
+  readonly pieceColorToChar: (a: number) => number;
+  readonly direction_to_i32: (a: number) => number;
+  readonly direction_to_i64: (a: number) => number;
+  readonly __wbg_tetpiece_free: (a: number, b: number) => void;
+  readonly __wbg_get_tetpiece_rotation: (a: number) => number;
+  readonly __wbg_set_tetpiece_rotation: (a: number, b: number) => void;
+  readonly __wbg_get_tetpiece_position: (a: number) => number;
+  readonly __wbg_set_tetpiece_position: (a: number, b: number) => void;
+  readonly tetpiece_new: (a: number, b: number, c: number) => number;
+  readonly tetpiece_z: () => number;
+  readonly tetpiece_i: () => number;
+  readonly tetpiece_j: () => number;
+  readonly tetpiece_l: () => number;
+  readonly tetpiece_o: () => number;
+  readonly tetpiece_t: () => number;
+  readonly tetpiece_s: () => number;
+  readonly tetpiece_applyGravity: (a: number, b: number) => void;
+  readonly tetpiece_clone: (a: number) => number;
+  readonly tetpiece_moveLeft: (a: number, b: number) => void;
+  readonly tetpiece_moveRight: (a: number, b: number) => void;
+  readonly tetpiece_getRawMinos: (a: number) => number;
+  readonly tetpiece_getMinos: (a: number) => number;
+  readonly tetpiece_color: (a: number) => number;
+  readonly tetpiece_set_color: (a: number, b: number) => void;
+  readonly tetpiece_minoAbove: (a: number, b: number) => number;
+  readonly direction_to_i8: (a: number) => number;
+  readonly __wbg_fumen_free: (a: number, b: number) => void;
   readonly __wbg_get_fumen_guideline: (a: number) => number;
   readonly __wbg_set_fumen_guideline: (a: number, b: number) => void;
-  readonly __wbg_page_free: (a: number) => void;
+  readonly __wbg_page_free: (a: number, b: number) => void;
   readonly __wbg_get_page_piece: (a: number) => number;
   readonly __wbg_set_page_piece: (a: number, b: number) => void;
   readonly __wbg_get_page_rise: (a: number) => number;
@@ -915,7 +973,7 @@ export interface InitOutput {
   readonly __wbg_set_page_mirror: (a: number, b: number) => void;
   readonly __wbg_get_page_lock: (a: number) => number;
   readonly __wbg_set_page_lock: (a: number, b: number) => void;
-  readonly __wbg_piece_free: (a: number) => void;
+  readonly __wbg_piece_free: (a: number, b: number) => void;
   readonly __wbg_get_piece_kind: (a: number) => number;
   readonly __wbg_set_piece_kind: (a: number, b: number) => void;
   readonly __wbg_get_piece_rotation: (a: number) => number;
@@ -936,7 +994,7 @@ export interface InitOutput {
   readonly page_set_comment: (a: number, b: number, c: number) => void;
   readonly page_set_field: (a: number, b: number) => void;
   readonly page_set_garbage_row: (a: number, b: number) => void;
-  readonly __wbg_decodefumenerror_free: (a: number) => void;
+  readonly __wbg_decodefumenerror_free: (a: number, b: number) => void;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
@@ -949,18 +1007,18 @@ export type SyncInitInput = BufferSource | WebAssembly.Module;
 * Instantiates the given `module`, which can either be bytes or
 * a precompiled `WebAssembly.Module`.
 *
-* @param {SyncInitInput} module
+* @param {{ module: SyncInitInput }} module - Passing `SyncInitInput` directly is deprecated.
 *
 * @returns {InitOutput}
 */
-export function initSync(module: SyncInitInput): InitOutput;
+export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;
 
 /**
 * If `module_or_path` is {RequestInfo} or {URL}, makes a request and
 * for everything else, calls `WebAssembly.instantiate` directly.
 *
-* @param {InitInput | Promise<InitInput>} module_or_path
+* @param {{ module_or_path: InitInput | Promise<InitInput> }} module_or_path - Passing `InitInput` directly is deprecated.
 *
 * @returns {Promise<InitOutput>}
 */
-export default function __wbg_init (module_or_path?: InitInput | Promise<InitInput>): Promise<InitOutput>;
+export default function __wbg_init (module_or_path?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>): Promise<InitOutput>;

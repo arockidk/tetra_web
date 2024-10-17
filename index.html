@@ -7,20 +7,30 @@
         <script src="pixi.min.js"></script>
         <script type="module" src="scripts/main.js"></script>
         <link rel="stylesheet" href="style.css">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
     </head>
     <body>
-        <div id="topbar"></div>
         <div id="main">
+            <div id="info-banner">
+                <span id="info-banner-text"></span>
+            </div>
             <div id="game">
                 <div id="hold" class="game"></div>
                 <div id="board" class="game"></div>
                 <div id="queue" class="game"></div>
+                
             </div>
             <div id="info"></div>
-            <div id="settings">
+            <div id="touch"></div>
+            <div id="buttons">
+                <button id="settings-button">Settings</button>
+                <button id="reset-button">Reset</button>
+            </div>
+            <div id="settings" style="display: none;">
 
             
             </div>
+            
         </div>
 
     </body>

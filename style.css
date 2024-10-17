@@ -3,19 +3,47 @@
     src: url(assets/Renogare-Regular.otf);
 }
 :root {
-    --color-a: #315d90;
-    --color-a-dark: #284567;
-    --grey: #a3a6b3;
+    --dark-red: #b80c09;
+    --mid-red: #d30d09;
+    --red: #e70d09;
+    --dark-cyan: #0b4f6c;
+    --dark-mid-cyan: #0e6f8c;
+    --mid-cyan: #04a5d2;
+    --bright-cyan: #01baef;
+    --white: #fbfbff;
+    --grey: #b0b1c4;
+    --black: #040f16;
+    
+    --grey: #ada3b3;
     font-family: Renogare;
     color: white;
 }
 body {
+    width: 100vw;
+    min-height: 100vh;
     margin: 0;
     background-color: black;
+    touch-action: none;
+}
+#info-banner {
+    background-color: var(--dark-cyan);
+    width: 100%;
+    height: 90px;
+    text-align: center;
+}
+#info-banner-text {
+    display: inline-block;
+    background-color: var(--bright-cyan);
+    width: calc(100% - 20px);
+    height: 70px;
+    margin: 10px;
+    padding: auto 0;
+    font-size: x-large;
+    
 }
 #topbar { 
     clear: both;
-    background-color: var(--color-a);
+    background-color: var(--bright-cyan);
     color: var(--grey);
     height: 60px;
     width: 100%;
@@ -24,18 +52,38 @@ body {
     font-size: 30px;
 }
 #game {
+    display: flex;
     width: 100%;
-    height: 500px;
+    height: 321px;
+    background-color: var(--dark-mid-cyan);
+    flex-direction: row;
+    justify-content: space-evenly;
+    align-items: stretch;
 }
 #settings {
-    width: 80%;
+    width: 100%;
     margin: auto;
     text-align: center;
-    background-color: var(--color-a-dark);
+    background-color: var(--dark-cyan);
+    position: absolute;
+    top: 10%;
+    
 }
-#hold {
-    position: relative;
-    bottom: 68%;
+#buttons {
+    height: 50px;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-evenly;
+    align-items: center;
+    background-color: var(--dark-mid-cyan);
+    
+
+}
+#buttons > button {
+    width: 75px;
+    height: 25px;
+    z-index: 900;
 }
 #info {
     color: var(--grey);
@@ -43,25 +91,52 @@ body {
     margin-bottom: 10px;
 }
 #main {
-    width: 512px;
-    height: auto;
-    background-color: var(--color-a-dark);
-    margin-left: 10%;
+    position: relative;
+    width: 100vw;
+    min-height: calc(514px + 40vw);
+    background-color: var(--dark-cyan);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: start;
 }
 #save-button {
     margin: 5px;
-    background-color: var(--color-a);
+    background-color: var(--bright-cyan);
     font-family: Renogare;
     color: white;
-    /* border: 2px solid var(--color-a-dark); */
+    /* border: 2px solid var(--cyan-dark); */
+}
+#touch {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    bottom: 0;
+}
+.touch-el {
+    height: 17vw;
+    width: 17vw;
+    max-height: 100px;
+    max-width: 100px;
+    position: absolute;
+    background-color: #0e6f8c77;
+
+    border: var(--dark-cyan) solid 2px;
+    line-height: min(17vw, 100px);
+    text-align: center;
+
+    z-index: 901;
 }
 .settings-input {
-    background-color: var(--color-a-dark);
+    background-color: var(--dark-cyan);
     width: 5rem;
     color: white;
     font-family: Renogare;
     font-size: smaller;
     text-align: center;
+}
+.info-display {
+    display: block;
 }
 .game {
     display: inline-block;
