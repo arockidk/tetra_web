@@ -90,7 +90,7 @@ class MinoGrid {
             this._minos[19 - y][x] = field.getTile(x, y);
             // console.log(tet.pieceColorToChar(this._minos[19 - y][x]));
             this.sprites[19 - y][x].texture = this._minoTexture.textures[tet.pieceColorToChar(this._minos[19 - y][x]).replace("X", "G")];
-            // this.sprites[19 - y][x].alpha = 1;
+            this.sprites[19 - y][x].alpha = 1;
         }
         // console.log(tet.pieceColorToChar(this._minos[1][5]).replace("X", "G")); 
         // console.log(tet.pieceColorToChar(8).replace("X", "G")); 
@@ -164,6 +164,13 @@ class FieldWrapper {
             changed.push(mino[0] + (19 - mino[1]) * 10);
         }
         return changed;
+    }
+    fill(blX, blY, width, height, c) {
+        for (let y = blY; y < blY + height; y++) {
+            for (let x = blX; x < blX + width; x++) {
+                this.field.setTile(x, y, c);
+            }
+        }
     }
     dasPiece(dir, amount) {
         this.field.dasPiece(dir, amount);
@@ -261,6 +268,8 @@ class PieceDisplay {
                 sprite.scale = v;
             }
         }
+        this._offsetX *= v / old;
+        this._offsetY *= v / old;
     }
     get container() {
         return this._container;
@@ -288,8 +297,8 @@ class PieceDisplay {
         this._offsetY = _offsetY;
         this.sprites = [];
         let cont = new PIXI.Container();
-        cont.x += _offsetX;
-        cont.y += _offsetY;
+        cont.x += _offsetX * _scale;
+        cont.y += _offsetY * _scale;
         for (let i = 0; i < 4; i++) {
             this.sprites.push([]);
             for (let j = 0; j < 4; j++) {
@@ -313,12 +322,14 @@ class InfoDisplay {
     _value;
     _units = "";
     _game;
-    constructor(label, game) {
+    _format;
+    constructor(label, game, format) {
         this._el = document.createElement("span");
         this._el.classList.add("info-display");
         this._el.id = `info-display-el-${label}`;
         this._label = label;
         this._game = game;
+        this._format = format;
     }
     update() {
         if (this._game) {
@@ -326,7 +337,9 @@ class InfoDisplay {
                 this._value = this._game.state[this._label];
             }
         }
-        this._el.innerText = `${this._label.toUpperCase()} ${this._value}${this._units}`;
+        this._el.innerText = `${this._label.toUpperCase()} \
+        ${this._format && this._value ? this._format(this._value) : this._value}${this._units}\
+        `;
     }
     set value(v) {
         this._value = v;
@@ -366,7 +379,7 @@ class FumenLoadComponent {
     loadFumen(fumString) {
         let tetFu = tet.TetFumen.load(fumString);
         if (this.game) {
-            this.game.field = tetFu.getPageAt(0).field;
+            this.game.field = new FieldWrapper(tetFu.getPageAt(0).field);
         }
     }
     constructor(game) {
@@ -379,7 +392,103 @@ class FumenLoadComponent {
         };
         div.appendChild(button);
         div.appendChild(input);
+        this.el = div;
     }
+}
+let globalTouchState = {
+    elements: {},
+    offsetX: {},
+    offsetY: {}
+};
+let controlMoving = false;
+function touchSetup(game) {
+    let elements = {};
+    let offsetX = {};
+    let offsetY = {};
+    let positionSaved = ""; //window.localStorage.getItem("touchPositions");
+    let positionData = positionSaved ? JSON.parse(positionSaved) : {};
+    if (!positionSaved) {
+        const reorder = [4, 5, 2, 1, 0, 3, 6, 7];
+        for (let i = 0; i < 8; i++) {
+            positionData[Object.keys(game.input)[reorder[i]]] = {
+                x: `calc(${(4 - (i % 5)) * (17 + 3)}vw)`,
+                y: `calc(${(1 - Math.floor(i / 5)) * (17 + 3)}vw + 518px)`
+            };
+        }
+        window.localStorage.setItem("touchPositions", JSON.stringify(positionData));
+    }
+    for (let i = 0; i < 8; i++) {
+        let input = Object.keys(game.input)[i];
+        let el = document.createElement("div");
+        el.id = `touch-${input}`;
+        el.classList.add("touch-el");
+        el.innerText = inputNames[i];
+        el.style.left = positionData[input].x;
+        el.style.top = positionData[input].y;
+        console.log(document.getElementById("touch"));
+        document.getElementById("touch").appendChild(el);
+        elements[input] = el;
+    }
+    let touchButtonMap = new Map();
+    function touchStart(e) {
+        e.preventDefault();
+        let pressed = e.changedTouches;
+        for (let i = 0; i < pressed.length; i++) {
+            let touch = pressed[i];
+            for (let [k, element] of Object.entries(elements)) {
+                let key = k;
+                let rect = element.getBoundingClientRect();
+                if (rect.left <= touch.clientX && rect.right >= touch.clientX && rect.top <= touch.clientY && rect.bottom >= touch.clientY) {
+                    touchButtonMap.set(touch.identifier, k);
+                    if (!controlMoving) {
+                        let keyObject = game.input[key];
+                        keyObject.pressed = true;
+                        keyObject.justPressed = true;
+                        keyObject.pressStart = Date.now();
+                    }
+                    else {
+                        offsetX[k] = touch.clientX - rect.left;
+                        offsetY[k] = touch.clientY - rect.top;
+                    }
+                }
+            }
+        }
+    }
+    function touchEnd(e) {
+        e.preventDefault();
+        let released = e.changedTouches;
+        for (let i = 0; i < released.length; i++) {
+            let touch = released[i];
+            let input = touchButtonMap.get(touch.identifier);
+            if (input) {
+                let keyObject = game.input[input];
+                keyObject.pressed = false;
+                keyObject.justPressed = false;
+                keyObject.pressStart = 0;
+                touchButtonMap.delete(touch.identifier);
+            }
+        }
+    }
+    function touchMove(e) {
+        e.preventDefault();
+        for (let i = 0; i < e.touches.length; i++) {
+            let touch = e.touches[i];
+            let input = touchButtonMap.get(touch.identifier);
+            if (input) {
+                let el = elements[input];
+                el.style.left = `calc(${touch.clientX / window.innerWidth * 100}vw - ${offsetX[input]}px)`;
+                el.style.top = `calc(${touch.clientY / window.innerHeight * 100}vh - ${offsetY[input]}px)`;
+            }
+        }
+    }
+    document.getElementById("touch").addEventListener("touchstart", touchStart);
+    document.getElementById("touch").addEventListener("touchend", touchEnd);
+    document.getElementById("touch").addEventListener("touchmove", touchMove);
+    return {
+        elements,
+        offsetX,
+        offsetY
+    };
 }
 function randint(min, max) {
     return Math.floor(Math.random() * (max - min + 1) + min);
@@ -402,6 +511,16 @@ function generate_queue() {
     return q;
 }
 ;
+const inputNames = [
+    "Left",
+    "Right",
+    "SD",
+    "HD",
+    "CW",
+    "CCW",
+    "Hold",
+    "180",
+];
 let SCORE_MAP = {
     "SINGLE": 200,
     "DOUBLE": 300,
@@ -570,7 +689,7 @@ function update(game) {
             game.state.softDrop = false;
         }
         game.state.currentGravity += game.settings.gravity * (game.state.softDrop ? game.settings.handling.SDF : 1)
-            * Math.max(1, Math.pow(2, game.state.level / 3.2));
+            * Math.max(1, Math.pow(2, game.state.level / 3.2)) * deltaTime / 16;
         if (game.state.currentGravity > 1) {
             game.field.dasPiece(tet.Direction.South, Math.floor(game.state.currentGravity));
             game.state.currentGravity = 0;
@@ -763,7 +882,9 @@ function update(game) {
             game.field.setActivePiece(undefined);
             let color = game.queue.takeNextPiece();
             if (game.queue.len() < game.settings.seeN + 3) {
-                game.queue.append(generate_queue());
+                let i = generate_queue();
+                // [0,0,0,0,0,0,0,0].forEach(v=>i.pushBack(new tet.QueueNode(tet.QueueNodeType.Piece, null, tet.PieceColor.I, null)));
+                game.queue.append(i);
             }
             game.queueDisplays.forEach((v, i) => {
                 v.piece = game.queue.at(i) ? game.queue.at(i)?.piece : undefined;
@@ -830,8 +951,8 @@ function countdown(game) {
         }, 1000);
     }, 1000);
 }
-function createInfoDisplay(label, game) {
-    let infoDisplay = new InfoDisplay(label, game);
+function createInfoDisplay(label, game, format) {
+    let infoDisplay = new InfoDisplay(label, game, format);
     game.infoDisplays.push(infoDisplay);
     document.getElementById("info").appendChild(infoDisplay.element);
     return infoDisplay;
@@ -848,7 +969,7 @@ function reset(game) {
     game.state.dased = false;
     game.state.pieceLifeStart = Date.now();
     game.state.frames = 0;
-    game.state.lines = 550;
+    game.state.lines = 0;
     game.state.L1value = 0;
     game.state.L2value = 0;
     game.state.L3value = 0;
@@ -880,7 +1001,7 @@ const BaseDimensions = {
         width: (game) => 4,
         height: (game) => game.settings.seeN * 4
     },
-    scale: 0.7
+    scale: 0.5
 };
 function load(game) {
     let keyMap = window.localStorage.getItem("keymap");
@@ -907,8 +1028,18 @@ function saveSettings(game, inputElements, handlingElements) {
     }
     window.localStorage.setItem("keymap", JSON.stringify(keymap));
     window.localStorage.setItem("handling", JSON.stringify(game.settings.handling));
+    let touchPositions = {};
+    for (let i = 0; i < 8; i++) {
+        touchPositions[Object.keys(game.input)[i]] = {
+            x: globalTouchState.elements[Object.keys(game.input)[i]].style.left,
+            y: globalTouchState.elements[Object.keys(game.input)[i]].style.top
+        };
+    }
+    window.localStorage.setItem("touchPositions", JSON.stringify(touchPositions));
+    document.getElementById("settings").style.display = "none";
+    controlMoving = false;
 }
-async function run_game() {
+async function init_app() {
     await init();
     let minoSheet = await PIXI.Assets.load("assets/skin_sheet.json");
     let renderer = new PIXI.WebGLRenderer();
@@ -1009,7 +1140,7 @@ async function run_game() {
     let holdDiv = document.getElementById("hold");
     let boardDiv = document.getElementById("board");
     let queueDiv = document.getElementById("queue");
-    boardDiv.style.height = Math.round((BaseDimensions.board.height(game) + 2 / 16) * 32 * BaseDimensions.scale) + "px";
+    boardDiv.style.height = Math.round(BaseDimensions.board.height(game) * 32 * BaseDimensions.scale) + "px";
     boardDiv.style.width = Math.round(BaseDimensions.board.width(game) * 32 * BaseDimensions.scale) + "px";
     queueDiv.style.height = Math.round(BaseDimensions.queue.height(game) * 32 * BaseDimensions.scale) + "px";
     queueDiv.style.width = Math.round(BaseDimensions.queue.width(game) * 32 * BaseDimensions.scale) + "px";
@@ -1020,13 +1151,13 @@ async function run_game() {
     document.getElementById("board").appendChild(renderer.canvas);
     document.getElementById("queue").appendChild(queueRenderer.canvas);
     document.getElementById("hold").appendChild(holdRenderer.canvas);
-    let scoreDisplay = createInfoDisplay("score", game);
+    let scoreDisplay = createInfoDisplay("score", game, (x) => x.toLocaleString());
     let linesDisplay = createInfoDisplay("lines", game);
     document.body.addEventListener('keydown', (e) => onInput(e, keymap, game));
     document.body.addEventListener('keyup', (e) => onInput(e, keymap, game));
     setInterval(() => {
         update(game);
-    }, 16);
+    }, 1.6);
     function createKeyInputElement(key) {
         let container = document.createElement("div");
         container.id = `settings-key-${key}`;
@@ -1078,6 +1209,22 @@ async function run_game() {
     saveButton.innerText = "Save";
     saveButton.addEventListener("click", () => saveSettings(game, inputElements, handlingElements));
     document.getElementById("settings").appendChild(saveButton);
+    let settings_button = document.getElementById("settings-button");
+    console.log(settings_button);
+    settings_button.onclick = function () {
+        controlMoving = true;
+        if (document.getElementById("settings").style.display == "block") {
+            document.getElementById("settings").style.display = "none";
+            controlMoving = false;
+            return;
+        }
+        document.getElementById("settings").style.display = "block";
+    };
+    let reset_button = document.getElementById("reset-button");
+    reset_button.onclick = function () {
+        reset(game);
+    };
+    globalTouchState = touchSetup(game);
 }
-window.onload = run_game;
+window.onload = init_app;
 //# sourceMappingURL=main.js.map
