@@ -470,6 +470,9 @@ function touchSetup(game) {
         }
     }
     function touchMove(e) {
+        if (!controlMoving) {
+            return;
+        }
         e.preventDefault();
         for (let i = 0; i < e.touches.length; i++) {
             let touch = e.touches[i];
@@ -1212,11 +1215,14 @@ async function init_app() {
     let settings_button = document.getElementById("settings-button");
     console.log(settings_button);
     settings_button.onclick = function () {
-        controlMoving = true;
         if (document.getElementById("settings").style.display == "block") {
             document.getElementById("settings").style.display = "none";
             controlMoving = false;
+            console.log("controlMoving", controlMoving);
             return;
+        }
+        else {
+            controlMoving = true;
         }
         document.getElementById("settings").style.display = "block";
     };
